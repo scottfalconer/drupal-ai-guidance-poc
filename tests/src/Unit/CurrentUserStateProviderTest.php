@@ -58,6 +58,17 @@ final class CurrentUserStateProviderTest extends UnitTestCase {
         'allowed_actions' => ['create', 'edit own'],
       ],
     ], $state['user']['content_type_permissions']);
+    $this->assertSame([
+      'what the current role can do',
+      'what the current role cannot do',
+      'who should handle blocked tasks',
+      'what to ask an administrator or site builder to do',
+    ], $state['user']['current_role_guidance']['answer_order']);
+    $this->assertContains('Create or edit `article` content according to the listed content permissions.', $state['user']['current_role_guidance']['current_user_can']);
+    $this->assertContains('Configure AI providers or provider credentials; this requires `administer ai providers`.', $state['user']['current_role_guidance']['current_user_cannot']);
+    $this->assertContains('Change role permissions; this requires `administer permissions`.', $state['user']['current_role_guidance']['current_user_cannot']);
+    $this->assertContains('Ask an administrator to configure AI providers and models before enabling editor-facing AI workflows.', $state['user']['current_role_guidance']['what_to_ask_admin']);
+    $this->assertContains('`administer ai providers` exposes provider setup and should stay administrator-only for editor rollouts.', $state['user']['current_role_guidance']['permissions_to_avoid_granting_for_editor_rollout']);
     $this->assertSame(
       'Current account cannot inspect the full role permission matrix; answer from current user state and ask an administrator to review /admin/people/roles when cross-role comparison is needed.',
       $state['user']['role_capability_note'],

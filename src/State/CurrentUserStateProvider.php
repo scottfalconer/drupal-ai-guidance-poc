@@ -60,6 +60,10 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
       'content_type_permissions' => $this->contentTypePermissions($account),
     ];
 
+    if ($this->roleGuidanceQuestion($request->question)) {
+      $user['current_role_guidance'] = $this->currentRoleGuidance($account, $user);
+    }
+
     if ($this->roleComparisonQuestion($request->question)) {
       if ($this->canInspectRoleMatrix($account)) {
         $user['role_capability_summary'] = $this->roleCapabilitySummary();
@@ -154,6 +158,96 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
       }
     }
     return FALSE;
+  }
+
+  /**
+   * Determines whether the question needs role-first guidance.
+   */
+  private function roleGuidanceQuestion(string $question): bool {
+    $question = strtolower($question);
+    foreach ([
+      'ai provider',
+      'ai providers',
+      'canvas',
+      'configure',
+      'configuration',
+      'draft',
+      'front page',
+      'permission',
+      'permissions',
+      'publish',
+      'role',
+      'what can i do',
+      'why can',
+    ] as $needle) {
+      if (str_contains($question, $needle)) {
+        return TRUE;
+      }
+    }
+    return FALSE;
+  }
+
+  /**
+   * Builds role-first guidance for the current account.
+   *
+   * @param array<string, mixed> $user
+   *   Safe current-user state.
+   *
+   * @return array<string, mixed>
+   *   Role guidance.
+   */
+  private function currentRoleGuidance(AccountInterface $account, array $user): array {
+    $can = [];
+    foreach ((array) ($user['content_type_permissions'] ?? []) as $content_type) {
+      $actions = (array) ($content_type['allowed_actions'] ?? []);
+      if (array_intersect($actions, ['create', 'edit own', 'edit any']) !== []) {
+        $can[] = 'Create or edit `' . $content_type['type'] . '` content according to the listed content permissions.';
+      }
+    }
+    if ($account->hasPermission('access administration pages')) {
+      $can[] = 'Access administration pages that this role is allowed to use.';
+    }
+    if ($account->hasPermission('view own unpublished content')) {
+      $can[] = 'View own unpublished content.';
+    }
+
+    $cannot = [];
+    $admin_requests = [];
+    $avoid_granting = [];
+    if (empty($user['can_administer_ai_providers'])) {
+      $cannot[] = 'Configure AI providers or provider credentials; this requires `administer ai providers`.';
+      $admin_requests[] = 'Ask an administrator to configure AI providers and models before enabling editor-facing AI workflows.';
+      $avoid_granting[] = '`administer ai providers` exposes provider setup and should stay administrator-only for editor rollouts.';
+    }
+    if (empty($user['can_administer_ai'])) {
+      $cannot[] = 'Administer global AI settings; this requires `administer ai`.';
+      $avoid_granting[] = '`administer ai` should stay administrator-only unless the role owns site-wide AI configuration.';
+    }
+    if (empty($user['can_administer_assistants'])) {
+      $cannot[] = 'Administer AI Assistant configuration; this requires `administer ai_assistant`.';
+      $avoid_granting[] = '`administer ai_assistant` controls assistant behavior and should not be granted just to use AI help.';
+    }
+    if (empty($user['can_administer_permissions'])) {
+      $cannot[] = 'Change role permissions; this requires `administer permissions`.';
+      $admin_requests[] = 'Ask an administrator to review role permissions at `/admin/people/permissions`.';
+      $avoid_granting[] = '`administer permissions` allows changing every role and should remain administrator-only.';
+    }
+    if (empty($user['can_administer_site_configuration'])) {
+      $cannot[] = 'Change site-wide configuration; this requires `administer site configuration`.';
+    }
+
+    return [
+      'answer_order' => [
+        'what the current role can do',
+        'what the current role cannot do',
+        'who should handle blocked tasks',
+        'what to ask an administrator or site builder to do',
+      ],
+      'current_user_can' => array_values(array_unique($can)),
+      'current_user_cannot' => array_values(array_unique($cannot)),
+      'what_to_ask_admin' => array_values(array_unique($admin_requests)),
+      'permissions_to_avoid_granting_for_editor_rollout' => array_values(array_unique($avoid_granting)),
+    ];
   }
 
   /**

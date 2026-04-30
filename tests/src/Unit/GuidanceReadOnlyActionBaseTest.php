@@ -53,8 +53,8 @@ final class GuidanceReadOnlyActionBaseTest extends UnitTestCase {
       ),
     ]);
 
-    $this->assertContains('- [[H1] Safe AI configuration for content editors](/admin/help/topic/ai_guidance.safe_editor_ai)', $lines);
-    $this->assertContains('Do not write a source link without its display citation ID. A source link is invalid unless the visible link text or the preceding text includes [S1], [H1], [BP1], or [C1].', $lines);
+    $this->assertContains('- [H1] [Safe AI configuration for content editors](/admin/help/topic/ai_guidance.safe_editor_ai)', $lines);
+    $this->assertContains('Final Sources bullets must start with their display citation ID and should copy the relevant bullet shown here.', $lines);
   }
 
 }
