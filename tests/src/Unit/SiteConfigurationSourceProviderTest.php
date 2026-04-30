@@ -176,6 +176,62 @@ final class SiteConfigurationSourceProviderTest extends UnitTestCase {
   }
 
   /**
+   * Tests front-page View displays are included even when labels are generic.
+   */
+  public function testFrontPageViewPathIsIncludedForPlacementQuestions(): void {
+    $config_factory = $this->createMock(ConfigFactoryInterface::class);
+    $config_factory->method('get')
+      ->willReturnCallback(fn(string $name): ImmutableConfig => match ($name) {
+        'system.site' => $this->config([
+          'name' => 'Vision25',
+          'page.front' => '/home',
+        ]),
+        'system.theme' => $this->config(['default' => 'olivero']),
+        'node.type.lab' => $this->config([
+          'type' => 'lab',
+          'name' => 'Lab',
+          'description' => 'Innovation lab content.',
+        ]),
+        'views.view.home_listing' => $this->config([
+          'id' => 'home_listing',
+          'label' => 'Home listing',
+          'description' => '',
+          'display' => [
+            'page_1' => [
+              'display_plugin' => 'page',
+              'display_options' => [
+                'path' => 'home',
+              ],
+            ],
+          ],
+        ]),
+        default => $this->config([]),
+      });
+    $config_factory->method('listAll')
+      ->willReturnCallback(static fn(string $prefix): array => match ($prefix) {
+        'node.type.' => ['node.type.lab'],
+        'views.view.' => ['views.view.home_listing'],
+        'canvas.component.' => [],
+        default => [],
+      });
+
+    $entity_type_manager = $this->createMock(EntityTypeManagerInterface::class);
+    $entity_type_manager->method('hasDefinition')->willReturn(FALSE);
+
+    $provider = new SiteConfigurationSourceProvider($config_factory, $entity_type_manager);
+    $request = new GuidanceRequest(
+      'I published this lab. Why is it not showing on the front page?',
+      $this->accountWithPermissions(['administer site configuration'], ['authenticated', 'administrator']),
+    );
+
+    $sources = iterator_to_array($provider->getSources($request, new GuidanceState([])));
+
+    $this->assertCount(1, $sources);
+    $this->assertStringContainsString('- `home_listing`: Home listing Paths: `/home`.', $sources[0]->text);
+    $this->assertStringContainsString('The configured front page path matches a View/listing in this safe configuration summary.', $sources[0]->text);
+  }
+
+  /**
    * Builds an immutable config mock.
    */
   private function config(array $data): ImmutableConfig {

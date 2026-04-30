@@ -39,11 +39,14 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       }
       $first_exercise = $this->beginnerQuestion($request->question) ? $this->firstSafeExerciseType($node_types) : NULL;
       $site_terms = $this->siteTerms();
-      $views = $full_summary ? $this->summarizeViews($request->question, $site_terms) : [];
-      $front_page_question = $this->frontPageQuestion($request->question);
-      $canvas = $full_summary && !$front_page_question ? $this->summarizeCanvasComponents($request->question, $site_terms) : [];
       $front_page_path = (string) ($site->get('page.front') ?? '/');
       $front_page_public_path = $this->publicPath($front_page_path);
+      $views = $full_summary ? $this->summarizeViews($request->question, $site_terms, [
+        $front_page_path,
+        $front_page_public_path,
+      ]) : [];
+      $front_page_question = $this->frontPageQuestion($request->question);
+      $canvas = $full_summary && !$front_page_question ? $this->summarizeCanvasComponents($request->question, $site_terms) : [];
       $front_page = $full_summary
         ? $this->summarizeFrontPage($front_page_path, $request, $node_types, $views)
         : $this->limitedFrontPageSummary($front_page_path, $request);
@@ -625,17 +628,19 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
    * @return array<int, array{id: string, label: string, description: string, paths: array<int, string>, blocks: array<int, string>}>
    *   View summaries.
    */
-  private function summarizeViews(string $question, array $site_terms): array {
+  private function summarizeViews(string $question, array $site_terms, array $front_page_paths = []): array {
     $views = [];
+    $front_page_paths = array_values(array_filter(array_unique(array_map(
+      static fn(string $path): string => '/' . ltrim($path, '/'),
+      $front_page_paths,
+    ))));
+
     foreach ($this->configFactory->listAll('views.view.') as $name) {
       $data = $this->configFactory->get($name)->getRawData();
       $id = (string) ($data['id'] ?? substr($name, strlen('views.view.')));
       $label = (string) ($data['label'] ?? $id);
       $description = GuidanceTextNormalizer::normalize((string) ($data['description'] ?? ''));
       $haystack = strtolower($id . ' ' . $label . ' ' . $description);
-      if (!$this->looksRelevant($haystack, $question, $site_terms)) {
-        continue;
-      }
 
       $paths = [];
       $blocks = [];
@@ -648,13 +653,20 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
           $blocks[] = (string) $display_id;
         }
       }
+      $paths = array_values(array_unique($paths));
+      $blocks = array_values(array_unique($blocks));
+
+      $front_page_match = array_intersect($paths, $front_page_paths) !== [];
+      if (!$front_page_match && !$this->looksRelevant($haystack, $question, $site_terms)) {
+        continue;
+      }
 
       $views[] = [
         'id' => $id,
         'label' => $label,
         'description' => $description,
-        'paths' => array_values(array_unique($paths)),
-        'blocks' => array_values(array_unique($blocks)),
+        'paths' => $paths,
+        'blocks' => $blocks,
       ];
     }
 
