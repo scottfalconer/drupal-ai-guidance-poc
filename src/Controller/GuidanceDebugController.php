@@ -10,6 +10,9 @@ use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\ai_assistant_api\AiAssistantActionPluginManager;
 use Drupal\ai_assistant_api\Entity\AiAssistant;
+use Drupal\ai_guidance\Evidence\GuidanceEvidenceCollector;
+use Drupal\ai_guidance\State\GuidanceStateAggregator;
+use Drupal\ai_guidance\Value\GuidanceRequest;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -25,6 +28,8 @@ final class GuidanceDebugController extends ControllerBase {
     private readonly EntityTypeManagerInterface $guidanceEntityTypeManager,
     private readonly AiAssistantActionPluginManager $actionPluginManager,
     private readonly RequestStack $requestStack,
+    private readonly GuidanceStateAggregator $stateAggregator,
+    private readonly GuidanceEvidenceCollector $evidenceCollector,
   ) {
   }
 
@@ -36,6 +41,8 @@ final class GuidanceDebugController extends ControllerBase {
       $container->get('entity_type.manager'),
       $container->get('ai_assistant_api.action_plugin.manager'),
       $container->get('request_stack'),
+      $container->get('ai_guidance.state_aggregator'),
+      $container->get('ai_guidance.evidence_collector'),
     );
   }
 
@@ -53,12 +60,16 @@ final class GuidanceDebugController extends ControllerBase {
       $enabled_actions = $assistant->get('actions_enabled') ?: [];
       $contexts = $this->actionPluginManager->listAllContexts($assistant, 'ai_guidance_debug', $enabled_actions);
     }
+    $guidance_request = new GuidanceRequest($question, $this->currentUser());
+    $state = $this->stateAggregator->build($guidance_request);
+    $evidence = $this->evidenceCollector->collect($guidance_request, $state);
 
     $data = [
       'assistant_exists' => $assistant instanceof AiAssistant,
       'assistant_id' => 'drupal_guidance_assistant',
       'enabled_actions' => array_keys((array) $enabled_actions),
       'question' => $question,
+      'evidence' => $evidence,
       'contexts' => $contexts,
     ];
 

@@ -15,6 +15,29 @@ services:
       $providers: !tagged_iterator guidance_state_provider
       $redactor: '@ai_guidance.redactor'
 
+  ai_guidance.domain_classifier:
+    class: Drupal\ai_guidance\Evidence\GuidanceDomainClassifier
+
+  ai_guidance.evidence_collector:
+    class: Drupal\ai_guidance\Evidence\GuidanceEvidenceCollector
+    arguments:
+      $classifier: '@ai_guidance.domain_classifier'
+      $providers: !tagged_iterator guidance_evidence_provider
+
+  Drupal\ai_guidance\Evidence\EcaEvidenceProvider:
+    arguments:
+      $configFactory: '@config.factory'
+      $moduleHandler: '@module_handler'
+    tags:
+      - { name: guidance_evidence_provider, priority: 20 }
+
+  Drupal\ai_guidance\Evidence\WebformEvidenceProvider:
+    arguments:
+      $configFactory: '@config.factory'
+      $moduleHandler: '@module_handler'
+    tags:
+      - { name: guidance_evidence_provider, priority: 15 }
+
   Drupal\ai_guidance\State\CurrentRouteStateProvider:
     arguments:
       $routeMatch: '@current_route_match'

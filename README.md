@@ -51,6 +51,17 @@ surface behavior.
 The demo assistant injects guidance through the AI Assistant action context API
 before the first model call. It does not expose executable actions.
 
+## Evidence Providers
+
+AI Guidance uses a small evidence-provider layer for Drupal-native
+introspection. The base module can classify questions and collect structured
+evidence from live Drupal state, such as access, workflow, content visibility,
+Views, forms, automation, AI feature access, and outside-agent handoff.
+
+Optional Drupal modules can add their own evidence providers later. The base
+module should name external evidence that is missing, but should not diagnose or
+implement systems outside Drupal itself.
+
 ## Current POC dependency
 
 This POC currently requires small `ai_assistant_api` changes for context-only
