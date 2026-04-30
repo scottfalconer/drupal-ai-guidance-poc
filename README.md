@@ -11,6 +11,17 @@ V1 is intentionally not an agent. It does not create content, mutate
 configuration, change permissions, execute Tool API tools, expose MCP resources,
 require AI Search, or provide a custom chat UI.
 
+## Why this matters
+
+Stock chat can explain Drupal in general. AI Guidance is meant to explain this
+Drupal site, for this user, from read-only evidence that Drupal already knows:
+routes, roles, permissions, Help, content models, workflows, Views, forms,
+automation, and optional trusted source documents.
+
+See [`docs/value-proposition.md`](docs/value-proposition.md) for the POC value
+case, the current evaluation signal, and how this complements the Learn Drupal
+AI education effort.
+
 ## Modules
 
 - `ai_guidance`: read-only AI Assistant context actions, safe state providers,
