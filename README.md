@@ -37,14 +37,6 @@ an authoritative site behavior contract. When generated contracts are available,
 `ai_guidance` should prefer the contract repository projection for route and
 surface behavior.
 
-## Acquia-specific context
-
-Acquia Cloud, Edge, Site Studio, Search, DAM, and Site Factory diagnostics are
-valuable enterprise guidance use cases, but they should live in an optional
-Acquia-owned extension instead of the base Drupal module. See
-`docs/acquia-context-extension.md` for the proposed context-action categories
-and guardrails.
-
 ## Demo setup
 
 1. Configure a default chat provider/model in AI settings.
