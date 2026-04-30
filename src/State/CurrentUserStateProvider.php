@@ -353,6 +353,21 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
     if ($account->hasPermission('view own unpublished content')) {
       $can[] = 'View own unpublished content.';
     }
+    if (!empty($user['can_administer_ai_providers'])) {
+      $can[] = 'Configure AI providers and provider credentials because this role has `administer ai providers`.';
+    }
+    if (!empty($user['can_administer_ai'])) {
+      $can[] = 'Administer global AI settings because this role has `administer ai`.';
+    }
+    if (!empty($user['can_administer_assistants'])) {
+      $can[] = 'Administer AI Assistant configuration because this role has `administer ai_assistant`.';
+    }
+    if (!empty($user['can_administer_permissions'])) {
+      $can[] = 'Change role permissions because this role has `administer permissions`.';
+    }
+    if (!empty($user['can_administer_site_configuration'])) {
+      $can[] = 'Change site-wide configuration because this role has `administer site configuration`.';
+    }
 
     $cannot = [];
     $admin_requests = [];

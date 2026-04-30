@@ -177,6 +177,34 @@ final class CurrentUserStateProviderTest extends UnitTestCase {
   }
 
   /**
+   * Tests role guidance lists admin capabilities instead of inventing blocks.
+   */
+  public function testCurrentRoleGuidanceForAdminPermissions(): void {
+    $config_factory = $this->createMock(ConfigFactoryInterface::class);
+    $config_factory->method('listAll')->willReturn([]);
+
+    $current_user = $this->createMock(AccountProxyInterface::class);
+    $provider = new CurrentUserStateProvider($current_user, $config_factory);
+
+    $state = $provider->getState(new GuidanceRequest(
+      'Why can I draft content, but not configure AI providers or permissions?',
+      $this->accountWithPermissions([
+        'administer ai',
+        'administer ai providers',
+        'administer ai_assistant',
+        'administer permissions',
+        'administer site configuration',
+      ], ['authenticated', 'administrator']),
+    ));
+
+    $guidance = $state['user']['current_role_guidance'];
+    $this->assertContains('Configure AI providers and provider credentials because this role has `administer ai providers`.', $guidance['current_user_can']);
+    $this->assertContains('Change role permissions because this role has `administer permissions`.', $guidance['current_user_can']);
+    $this->assertNotContains('Configure AI providers or provider credentials; this requires `administer ai providers`.', $guidance['current_user_cannot']);
+    $this->assertNotContains('Change role permissions; this requires `administer permissions`.', $guidance['current_user_cannot']);
+  }
+
+  /**
    * Tests registry-derived restricted permissions.
    */
   public function testPermissionRegistryAddsRestrictedPermissions(): void {

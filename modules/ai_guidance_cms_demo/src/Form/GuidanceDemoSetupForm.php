@@ -75,7 +75,7 @@ final class GuidanceDemoSetupForm extends FormBase {
       '#items' => [
         $this->t('What can I do on this page?'),
         $this->t('How do I configure Drupal AI safely for content editors?'),
-        $this->t('Why can I draft content, but not configure AI providers or permissions?'),
+        $this->t('Why can content editors draft content, but not configure AI providers or permissions?'),
         $this->t('Compare what anonymous, content editor, and administrator can do on this page.'),
         $this->t('How is this site built?'),
         $this->t('How should an outside coding agent work on this site?'),
