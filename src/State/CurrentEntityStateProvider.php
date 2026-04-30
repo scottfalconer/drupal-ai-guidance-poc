@@ -45,11 +45,19 @@ final class CurrentEntityStateProvider implements GuidanceStateProviderInterface
         'label' => $parameter->label(),
         'bundle' => $parameter instanceof ContentEntityInterface ? $parameter->bundle() : NULL,
         'language' => $parameter instanceof ContentEntityInterface ? $parameter->language()->getId() : NULL,
+        'access' => [
+          'view' => TRUE,
+          'update' => $parameter->access('update', $account),
+          'delete' => $parameter->access('delete', $account),
+        ],
       ];
 
       if ($parameter instanceof ContentEntityInterface && $parameter->getEntityType()->hasKey('published')) {
         $published_key = $parameter->getEntityType()->getKey('published');
         $summary['published'] = $published_key ? (bool) $parameter->get($published_key)->value : NULL;
+      }
+      if ($parameter instanceof ContentEntityInterface && $parameter->hasField('moderation_state') && !$parameter->get('moderation_state')->isEmpty()) {
+        $summary['moderation_state'] = (string) $parameter->get('moderation_state')->value;
       }
 
       return ['entity' => $summary];

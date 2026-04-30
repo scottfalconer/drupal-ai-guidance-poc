@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\ai_guidance\Source;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Session\AccountInterface;
@@ -33,7 +34,7 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       $site = $this->configFactory->get('system.site');
       $system_theme = $this->configFactory->get('system.theme');
       $full_summary = $this->canUseFullConfigurationSummary($request);
-      $node_types = $this->summarizeNodeTypes();
+      $node_types = $this->summarizeNodeTypes($full_summary);
       if (!$full_summary) {
         $node_types = $this->filterNodeTypesForCurrentUser($node_types, $request);
       }
@@ -45,6 +46,7 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
         $front_page_path,
         $front_page_public_path,
       ]) : [];
+      $workflows = $full_summary ? $this->summarizeWorkflows() : [];
       $front_page_question = $this->frontPageQuestion($request->question);
       $canvas = $full_summary && !$front_page_question ? $this->summarizeCanvasComponents($request->question, $site_terms) : [];
       $front_page = $full_summary
@@ -80,6 +82,9 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
         $lines[] = '- `' . $type['id'] . '`: ' . $type['label']
           . ($type['description'] !== '' ? ' - ' . $type['description'] : '')
           . (!empty($type['access_summary']) ? ' Current account: ' . $type['access_summary'] . '.' : '');
+        if ($full_summary && !empty($type['fields'])) {
+          $lines[] = '  - Fields: ' . implode('; ', array_map([$this, 'formatFieldSummary'], $type['fields'])) . '.';
+        }
       }
       $lines[] = '';
     }
@@ -88,6 +93,9 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       $lines[] = '## Beginner first exercise';
       $lines[] = '- Suggested first safe exercise: create exactly one draft `' . $first_exercise['label'] . '` item at `/node/add/' . $first_exercise['id'] . '`.';
       $lines[] = '- Success criteria: the item is saved as a draft or unpublished item, appears in `/admin/content`, can be previewed, and does not need to appear on the public front page.';
+      if (!empty($first_exercise['required_fields'])) {
+        $lines[] = '- Required fields to fill first: `' . implode('`, `', $first_exercise['required_fields']) . '`.';
+      }
       $lines[] = '- Do not list alternative first exercises unless the user asks for options.';
       $lines[] = '';
     }
@@ -131,6 +139,9 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
           $lines[] = '  - ' . $label . ' (`' . $component['component_id'] . '`)';
         }
       }
+      if (!empty($front_page['referenced_sources'])) {
+        $lines[] = '- Front page referenced sources: ' . implode('; ', $front_page['referenced_sources']) . '.';
+      }
       if (!empty($front_page['listed_content_signals'])) {
         $lines[] = '- Front page listed content signals: ' . implode(', ', $front_page['listed_content_signals']) . '.';
       }
@@ -145,10 +156,33 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
     if ($views !== []) {
       $lines[] = '## Views and content listings';
       foreach ($views as $view) {
-        $lines[] = '- `' . $view['id'] . '`: ' . $view['label']
+        $line = '- `' . $view['id'] . '`: ' . $view['label']
           . ($view['description'] !== '' ? ' - ' . $view['description'] : '')
+          . ($view['base_table'] !== '' ? ' Base: `' . $view['base_table'] . '`.' : '')
           . ($view['paths'] !== [] ? ' Paths: `' . implode('`, `', $view['paths']) . '`.' : '')
           . ($view['blocks'] !== [] ? ' Blocks: `' . implode('`, `', $view['blocks']) . '`.' : '');
+        if ($view['filters'] !== []) {
+          $line .= ' Filters: ' . implode('; ', $view['filters']) . '.';
+        }
+        if ($view['sorts'] !== []) {
+          $line .= ' Sorts: ' . implode('; ', $view['sorts']) . '.';
+        }
+        if ($view['access'] !== []) {
+          $line .= ' Access: ' . implode('; ', $view['access']) . '.';
+        }
+        $lines[] = $line;
+      }
+      $lines[] = '';
+    }
+
+    if ($workflows !== []) {
+      $lines[] = '## Workflows and moderation';
+      foreach ($workflows as $workflow) {
+        $lines[] = '- `' . $workflow['id'] . '`: ' . $workflow['label']
+          . ($workflow['type'] !== '' ? ' (`' . $workflow['type'] . '`)' : '')
+          . ($workflow['bundles'] !== [] ? ' Bundles: `' . implode('`, `', $workflow['bundles']) . '`.' : '')
+          . ($workflow['states'] !== [] ? ' States: ' . implode(', ', $workflow['states']) . '.' : '')
+          . ($workflow['transitions'] !== [] ? ' Transitions: ' . implode('; ', $workflow['transitions']) . '.' : '');
       }
       $lines[] = '';
     }
@@ -181,6 +215,7 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
         'exposure_level' => $full_summary ? 'full_for_site_configuration_admin' : 'limited_for_current_account',
         'node_type_count' => count($node_types),
         'view_count' => count($views),
+        'workflow_count' => count($workflows),
         'canvas_component_count' => count($canvas),
       ],
       accessNotes: [
@@ -280,6 +315,8 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
    *
    * @param array<int, array{id: string, label: string, description: string}> $node_types
    *   Node type summaries.
+   * @param \Drupal\ai_guidance\Value\GuidanceRequest $request
+   *   Guidance request.
    *
    * @return array<int, array{id: string, label: string, description: string, access_summary?: string}>
    *   Node type summaries with current-account access notes.
@@ -367,7 +404,8 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
         $summary['edit_path'] = $this->entityEditPath($entity, $request);
         $summary['composition'] = 'Canvas page composed from component-tree entries.';
         $summary['components'] = $this->summarizeCanvasPageComponents($entity);
-        $summary['listed_content_signals'] = $this->frontPageContentSignals($summary['components'], $node_types);
+        $summary['listed_content_signals'] = $this->frontPageContentSignals($summary['components'], $node_types, $views);
+        $summary['referenced_sources'] = $this->summarizeEntityReferenceFields($entity);
         $summary['guidance'][] = 'A newly created node appears on this front page only when a Canvas component or its underlying query selects it.';
         $summary['guidance'][] = 'To add a standalone link or card, open the front page edit path when available, then add or edit the relevant Canvas component by label.';
         $summary['guidance'][] = 'For verification steps, send users to the public front page path `' . $summary['public_path'] . '`, not the configured internal path when those differ.';
@@ -497,6 +535,40 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
   }
 
   /**
+   * Summarizes entity-reference fields on a content entity.
+   *
+   * @return string[]
+   *   Human-readable referenced source summaries.
+   */
+  private function summarizeEntityReferenceFields(EntityInterface $entity): array {
+    if (!$entity instanceof ContentEntityInterface) {
+      return [];
+    }
+
+    $sources = [];
+    foreach ($entity->getFieldDefinitions() as $field_name => $definition) {
+      $type = $definition->getType();
+      if (!in_array($type, ['entity_reference', 'entity_reference_revisions'], TRUE)) {
+        continue;
+      }
+      $settings = $definition->getSettings();
+      $target_type = (string) ($settings['target_type'] ?? '');
+      $target_bundles = array_keys((array) ($settings['handler_settings']['target_bundles'] ?? []));
+      $label = (string) $definition->getLabel();
+      $summary = '`' . $field_name . '`'
+        . ($label !== '' ? ' (' . $label . ')' : '')
+        . ($target_type !== '' ? ' references `' . $target_type . '`' : '');
+      if ($target_bundles !== []) {
+        $summary .= ' bundles `' . implode('`, `', $target_bundles) . '`';
+      }
+      $sources[] = $summary;
+    }
+
+    sort($sources, SORT_STRING);
+    return array_slice($sources, 0, 8);
+  }
+
+  /**
    * Summarizes Canvas page component-tree entries.
    *
    * @return array<int, array{component_id: string, label: string}>
@@ -527,42 +599,117 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
    *
    * @param array<int, array{component_id: string, label: string}> $components
    *   Component summaries.
+   * @param array<int, array<string, mixed>> $node_types
+   *   Node type summaries.
+   * @param array<int, array<string, mixed>> $views
+   *   View summaries.
    *
    * @return string[]
    *   Human-readable signals.
    */
-  private function frontPageContentSignals(array $components, array $node_types): array {
+  private function frontPageContentSignals(array $components, array $node_types, array $views): array {
     $signals = [];
     foreach ($components as $component) {
       $haystack = strtolower($component['component_id'] . ' ' . $component['label']);
       foreach ($node_types as $node_type) {
-        $id = strtolower((string) ($node_type['id'] ?? ''));
-        $label = strtolower((string) ($node_type['label'] ?? ''));
-        if ($id !== '' && str_contains($haystack, $id)) {
+        if ($this->haystackMatchesContentType($haystack, $node_type)) {
+          $label = strtolower((string) ($node_type['label'] ?? ''));
+          $id = strtolower((string) ($node_type['id'] ?? ''));
           $signals[] = $label !== '' ? $label : $id;
         }
-        elseif ($label !== '' && str_contains($haystack, $label)) {
-          $signals[] = $label;
+      }
+      foreach ($views as $view) {
+        $view_haystack = strtolower($view['id'] . ' ' . $view['label'] . ' '
+          . implode(' ', $view['paths']) . ' ' . implode(' ', $view['blocks']));
+        if (!$this->sharesMeaningfulToken($haystack, $view_haystack)) {
+          continue;
         }
-      }
-      if (str_contains($haystack, 'recipe')) {
-        $signals[] = 'recipes';
-      }
-      if (str_contains($haystack, 'story') || str_contains($haystack, 'stories') || str_contains($haystack, 'article')) {
-        $signals[] = 'stories/articles';
-      }
-      if (str_contains($haystack, 'collection')) {
-        $signals[] = 'collections';
-      }
-      if (str_contains($haystack, 'topic')) {
-        $signals[] = 'topics';
-      }
-      if (str_contains($haystack, 'page')) {
-        $signals[] = 'utility pages';
+        foreach ((array) ($view['bundle_filters'] ?? []) as $bundle) {
+          $label = $this->nodeTypeLabel((string) $bundle, $node_types);
+          $signals[] = $label !== '' ? strtolower($label) : (string) $bundle;
+        }
       }
     }
 
-    return array_values(array_unique($signals));
+    return array_values(array_unique(array_filter($signals)));
+  }
+
+  /**
+   * Checks whether component text matches a content type.
+   *
+   * @param string $haystack
+   *   Text to inspect.
+   * @param array<string, mixed> $node_type
+   *   Node type summary.
+   */
+  private function haystackMatchesContentType(string $haystack, array $node_type): bool {
+    foreach ($this->contentTypeTerms($node_type) as $term) {
+      if ($term !== '' && str_contains($haystack, $term)) {
+        return TRUE;
+      }
+    }
+    return FALSE;
+  }
+
+  /**
+   * Returns normalized content-type terms with simple singular/plural variants.
+   *
+   * @param array<string, mixed> $node_type
+   *   Node type summary.
+   *
+   * @return string[]
+   *   Terms.
+   */
+  private function contentTypeTerms(array $node_type): array {
+    $source = strtolower(implode(' ', [
+      (string) ($node_type['id'] ?? ''),
+      (string) ($node_type['label'] ?? ''),
+      (string) ($node_type['description'] ?? ''),
+    ]));
+    $terms = [];
+    foreach (preg_split('/[^a-z0-9_]+/', $source) ?: [] as $term) {
+      if (strlen($term) < 3) {
+        continue;
+      }
+      $terms[] = $term;
+      $terms[] = rtrim($term, 's');
+      $terms[] = $term . 's';
+      if (str_ends_with($term, 'y')) {
+        $terms[] = substr($term, 0, -1) . 'ies';
+      }
+    }
+    return array_values(array_unique(array_filter($terms)));
+  }
+
+  /**
+   * Checks whether two identifiers share a useful token.
+   */
+  private function sharesMeaningfulToken(string $a, string $b): bool {
+    $stop = ['block', 'canvas', 'content', 'display', 'front', 'home', 'latest', 'listing', 'page', 'view'];
+    foreach (preg_split('/[^a-z0-9_]+/', $a) ?: [] as $term) {
+      if (strlen($term) > 3 && !in_array($term, $stop, TRUE) && str_contains($b, $term)) {
+        return TRUE;
+      }
+      if (str_ends_with($term, 'ies')) {
+        $singular = substr($term, 0, -3) . 'y';
+        if (strlen($singular) > 3 && str_contains($b, $singular)) {
+          return TRUE;
+        }
+      }
+    }
+    return FALSE;
+  }
+
+  /**
+   * Returns the label for a node type ID in an existing summary list.
+   */
+  private function nodeTypeLabel(string $bundle, array $node_types): string {
+    foreach ($node_types as $node_type) {
+      if (($node_type['id'] ?? NULL) === $bundle) {
+        return (string) ($node_type['label'] ?? $bundle);
+      }
+    }
+    return '';
   }
 
   /**
@@ -580,10 +727,10 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
   /**
    * Summarizes node types from active configuration.
    *
-   * @return array<int, array{id: string, label: string, description: string}>
+   * @return array<int, array<string, mixed>>
    *   Node type summaries.
    */
-  private function summarizeNodeTypes(): array {
+  private function summarizeNodeTypes(bool $include_fields = FALSE): array {
     $types = [];
     foreach ($this->configFactory->listAll('node.type.') as $name) {
       $data = $this->configFactory->get($name)->getRawData();
@@ -592,10 +739,80 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
         'id' => $id,
         'label' => (string) ($data['name'] ?? $id),
         'description' => GuidanceTextNormalizer::normalize((string) ($data['description'] ?? '')),
+        'fields' => $include_fields ? $this->summarizeBundleFields($id) : [],
       ];
     }
     usort($types, static fn(array $a, array $b): int => strcmp($a['id'], $b['id']));
     return array_slice($types, 0, 12);
+  }
+
+  /**
+   * Summarizes configured fields for a node bundle.
+   *
+   * @return array<int, array<string, mixed>>
+   *   Field summaries.
+   */
+  private function summarizeBundleFields(string $bundle): array {
+    $form_display = $this->configFactory->get('core.entity_form_display.node.' . $bundle . '.default')->getRawData();
+    $view_display = $this->configFactory->get('core.entity_view_display.node.' . $bundle . '.default')->getRawData();
+    $form_fields = array_keys((array) ($form_display['content'] ?? []));
+    $view_fields = array_keys((array) ($view_display['content'] ?? []));
+
+    $fields = [];
+    foreach ($this->configFactory->listAll('field.field.node.' . $bundle . '.') as $name) {
+      $data = $this->configFactory->get($name)->getRawData();
+      $field_name = (string) ($data['field_name'] ?? substr($name, strlen('field.field.node.' . $bundle . '.')));
+      if ($field_name === '') {
+        continue;
+      }
+      $storage = $this->configFactory->get('field.storage.node.' . $field_name)->getRawData();
+      $target_bundles = array_values(array_map('strval', array_keys((array) ($data['settings']['handler_settings']['target_bundles'] ?? []))));
+      $fields[] = [
+        'name' => $field_name,
+        'label' => (string) ($data['label'] ?? $field_name),
+        'description' => GuidanceTextNormalizer::normalize((string) ($data['description'] ?? '')),
+        'type' => (string) ($storage['type'] ?? $data['field_type'] ?? 'unknown'),
+        'required' => !empty($data['required']),
+        'cardinality' => (int) ($storage['cardinality'] ?? 1),
+        'target_type' => (string) ($storage['settings']['target_type'] ?? ''),
+        'target_bundles' => $target_bundles,
+        'on_form' => in_array($field_name, $form_fields, TRUE),
+        'on_display' => in_array($field_name, $view_fields, TRUE),
+      ];
+    }
+
+    usort($fields, static function (array $a, array $b): int {
+      return ((int) $b['required'] <=> (int) $a['required'])
+        ?: strcmp((string) $a['name'], (string) $b['name']);
+    });
+    return array_slice($fields, 0, 8);
+  }
+
+  /**
+   * Formats a field summary for source text.
+   *
+   * @param array<string, mixed> $field
+   *   Field summary.
+   */
+  private function formatFieldSummary(array $field): string {
+    $parts = [
+      '`' . $field['name'] . '`',
+      (string) $field['label'],
+      '`' . $field['type'] . '`',
+      !empty($field['required']) ? 'required' : 'optional',
+    ];
+    if ((int) ($field['cardinality'] ?? 1) === -1) {
+      $parts[] = 'multi-value';
+    }
+    if (!empty($field['target_type'])) {
+      $parts[] = 'references `' . $field['target_type'] . '`';
+    }
+    if (!empty($field['target_bundles'])) {
+      $parts[] = 'target bundles `' . implode('`, `', (array) $field['target_bundles']) . '`';
+    }
+    $parts[] = !empty($field['on_form']) ? 'shown on form' : 'hidden on default form';
+    $parts[] = !empty($field['on_display']) ? 'shown on display' : 'hidden on default display';
+    return implode(', ', array_filter($parts));
   }
 
   /**
@@ -616,16 +833,41 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       if (($type['id'] ?? '') === 'page') {
         continue;
       }
+      $type['required_fields'] = $this->requiredFormFields($type);
       return $type;
     }
 
-    return $node_types[0] ?? NULL;
+    if (!empty($node_types[0])) {
+      $node_types[0]['required_fields'] = $this->requiredFormFields($node_types[0]);
+      return $node_types[0];
+    }
+
+    return NULL;
+  }
+
+  /**
+   * Returns required fields visible on the default form.
+   *
+   * @param array<string, mixed> $type
+   *   Node type summary.
+   *
+   * @return string[]
+   *   Required field machine names.
+   */
+  private function requiredFormFields(array $type): array {
+    $fields = [];
+    foreach ((array) ($type['fields'] ?? []) as $field) {
+      if (!empty($field['required']) && !empty($field['on_form'])) {
+        $fields[] = (string) ($field['name'] ?? '');
+      }
+    }
+    return array_values(array_filter($fields));
   }
 
   /**
    * Summarizes relevant Views from active configuration.
    *
-   * @return array<int, array{id: string, label: string, description: string, paths: array<int, string>, blocks: array<int, string>}>
+   * @return array<int, array<string, mixed>>
    *   View summaries.
    */
   private function summarizeViews(string $question, array $site_terms, array $front_page_paths = []): array {
@@ -640,10 +882,15 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       $id = (string) ($data['id'] ?? substr($name, strlen('views.view.')));
       $label = (string) ($data['label'] ?? $id);
       $description = GuidanceTextNormalizer::normalize((string) ($data['description'] ?? ''));
+      $base_table = (string) ($data['base_table'] ?? '');
       $haystack = strtolower($id . ' ' . $label . ' ' . $description);
 
       $paths = [];
       $blocks = [];
+      $filters = [];
+      $sorts = [];
+      $access = [];
+      $bundle_filters = [];
       foreach ((array) ($data['display'] ?? []) as $display_id => $display) {
         $display_options = (array) ($display['display_options'] ?? []);
         if (!empty($display_options['path'])) {
@@ -652,9 +899,34 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
         if (($display['display_plugin'] ?? NULL) === 'block') {
           $blocks[] = (string) $display_id;
         }
+        foreach ((array) ($display_options['filters'] ?? []) as $filter_id => $filter) {
+          $summary = $this->summarizeViewPlugin((string) $filter_id, (array) $filter);
+          if ($summary !== '') {
+            $filters[] = $summary;
+          }
+          foreach ($this->bundleFilterValues((string) $filter_id, (array) $filter) as $bundle) {
+            $bundle_filters[] = $bundle;
+          }
+        }
+        foreach ((array) ($display_options['sorts'] ?? []) as $sort_id => $sort) {
+          $summary = $this->summarizeViewPlugin((string) $sort_id, (array) $sort);
+          if ($summary !== '') {
+            $sorts[] = $summary;
+          }
+        }
+        if (!empty($display_options['access'])) {
+          $access_summary = $this->summarizeViewAccess((array) $display_options['access']);
+          if ($access_summary !== '') {
+            $access[] = $access_summary;
+          }
+        }
       }
       $paths = array_values(array_unique($paths));
       $blocks = array_values(array_unique($blocks));
+      $filters = array_values(array_unique($filters));
+      $sorts = array_values(array_unique($sorts));
+      $access = array_values(array_unique($access));
+      $bundle_filters = array_values(array_unique($bundle_filters));
 
       $front_page_match = array_intersect($paths, $front_page_paths) !== [];
       if (!$front_page_match && !$this->looksRelevant($haystack, $question, $site_terms)) {
@@ -665,14 +937,150 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
         'id' => $id,
         'label' => $label,
         'description' => $description,
+        'base_table' => $base_table,
         'paths' => $paths,
         'blocks' => $blocks,
+        'filters' => array_slice($filters, 0, 8),
+        'sorts' => array_slice($sorts, 0, 5),
+        'access' => array_slice($access, 0, 4),
+        'bundle_filters' => $bundle_filters,
       ];
     }
 
     usort($views, fn(array $a, array $b): int => $this->siteSpecificScore($b['id'], $site_terms) <=> $this->siteSpecificScore($a['id'], $site_terms)
       ?: strcmp($a['id'], $b['id']));
     return array_slice($views, 0, 10);
+  }
+
+  /**
+   * Summarizes a Views filter/sort plugin in user-readable form.
+   *
+   * @param string $id
+   *   Views plugin ID.
+   * @param array<string, mixed> $plugin
+   *   Raw Views plugin config.
+   */
+  private function summarizeViewPlugin(string $id, array $plugin): string {
+    $field = (string) ($plugin['field'] ?? $id);
+    $operator = (string) ($plugin['operator'] ?? '');
+    $value = $plugin['value'] ?? NULL;
+    if (is_array($value)) {
+      $value = implode(', ', array_map('strval', array_filter(
+        $value,
+        static fn($item): bool => $item !== '' && $item !== NULL,
+      )));
+    }
+    elseif ($value !== NULL && $value !== '') {
+      $value = (string) $value;
+    }
+    else {
+      $value = '';
+    }
+
+    $summary = '`' . $field . '`';
+    if ($operator !== '') {
+      $summary .= ' ' . $operator;
+    }
+    if ($value !== '') {
+      $summary .= ' `' . $value . '`';
+    }
+    if (!empty($plugin['exposed'])) {
+      $summary .= ' (exposed)';
+    }
+    if (!empty($plugin['order'])) {
+      $summary .= ' ' . strtolower((string) $plugin['order']);
+    }
+    return $summary;
+  }
+
+  /**
+   * Extracts bundle values from common Views bundle filters.
+   *
+   * @param string $id
+   *   Views filter ID.
+   * @param array<string, mixed> $filter
+   *   Raw Views filter config.
+   *
+   * @return string[]
+   *   Bundle IDs.
+   */
+  private function bundleFilterValues(string $id, array $filter): array {
+    $field = (string) ($filter['field'] ?? $id);
+    if (!in_array($field, ['type', 'bundle'], TRUE)) {
+      return [];
+    }
+    $value = $filter['value'] ?? [];
+    if (is_string($value)) {
+      return [$value];
+    }
+    if (!is_array($value)) {
+      return [];
+    }
+    return array_values(array_filter(array_map('strval', $value), static fn(string $item): bool => $item !== ''));
+  }
+
+  /**
+   * Summarizes a Views access plugin.
+   *
+   * @param array<string, mixed> $access
+   *   Raw access plugin config.
+   */
+  private function summarizeViewAccess(array $access): string {
+    $type = (string) ($access['type'] ?? $access['plugin_id'] ?? '');
+    if ($type === '') {
+      return '';
+    }
+    $summary = '`' . $type . '`';
+    if (!empty($access['options']['perm'])) {
+      $summary .= ' permission `' . $access['options']['perm'] . '`';
+    }
+    elseif (!empty($access['options']['role'])) {
+      $summary .= ' roles `' . implode('`, `', array_map('strval', (array) $access['options']['role'])) . '`';
+    }
+    return $summary;
+  }
+
+  /**
+   * Summarizes configured workflows and moderation transitions.
+   *
+   * @return array<int, array<string, mixed>>
+   *   Workflow summaries.
+   */
+  private function summarizeWorkflows(): array {
+    $workflows = [];
+    foreach ($this->configFactory->listAll('workflows.workflow.') as $name) {
+      $data = $this->configFactory->get($name)->getRawData();
+      $id = (string) ($data['id'] ?? substr($name, strlen('workflows.workflow.')));
+      $type_settings = (array) ($data['type_settings'] ?? []);
+      $states = [];
+      foreach ((array) ($type_settings['states'] ?? []) as $state_id => $state) {
+        $states[] = ((string) ($state['label'] ?? $state_id)) . ' (`' . $state_id . '`)';
+      }
+      $transitions = [];
+      foreach ((array) ($type_settings['transitions'] ?? []) as $transition_id => $transition) {
+        $from = implode(', ', array_map('strval', (array) ($transition['from'] ?? [])));
+        $to = (string) ($transition['to'] ?? '');
+        $transitions[] = ((string) ($transition['label'] ?? $transition_id)) . ' (`' . $transition_id . '`' . ($from !== '' || $to !== '' ? ': ' . $from . ' -> ' . $to : '') . ')';
+      }
+      $bundles = [];
+      foreach ((array) ($type_settings['entity_types'] ?? []) as $entity_type => $entity_bundles) {
+        foreach ((array) $entity_bundles as $bundle) {
+          $bundles[] = (string) $entity_type . ':' . (string) $bundle;
+        }
+      }
+
+      $workflows[] = [
+        'id' => $id,
+        'label' => (string) ($data['label'] ?? $id),
+        'type' => (string) ($data['type'] ?? ''),
+        'states' => array_slice($states, 0, 8),
+        'transitions' => array_slice($transitions, 0, 10),
+        'bundles' => array_slice(array_values(array_unique($bundles)), 0, 12),
+      ];
+    }
+
+    usort($workflows, static fn(array $a, array $b): int => strcmp($a['id'], $b['id']));
+    return array_slice($workflows, 0, 8);
   }
 
   /**
@@ -718,8 +1126,23 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       $terms[] = (string) ($data['type'] ?? substr($name, strlen('node.type.')));
       $terms = array_merge($terms, preg_split('/[^a-z0-9_]+/', strtolower((string) ($data['name'] ?? ''))) ?: []);
     }
-    $generic = ['block', 'canvas', 'content', 'file', 'media', 'node', 'page', 'recent', 'search', 'system', 'taxonomy', 'user', 'view'];
-    return array_values(array_unique(array_filter($terms, static fn(string $term): bool => strlen($term) > 2 && !in_array($term, $generic, TRUE))));
+    $generic = [
+      'block',
+      'canvas',
+      'content',
+      'file',
+      'media',
+      'node',
+      'page',
+      'recent',
+      'search',
+      'system',
+      'taxonomy',
+      'user',
+      'view',
+    ];
+    return array_values(array_unique(array_filter($terms, static fn(string $term): bool => strlen($term) > 2
+      && !in_array($term, $generic, TRUE))));
   }
 
   /**
@@ -739,6 +1162,10 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
   /**
    * Checks whether a config summary is relevant enough to include.
    *
+   * @param string $haystack
+   *   Summary text to inspect.
+   * @param string $question
+   *   User question.
    * @param string[] $fallback_terms
    *   Site-builder-oriented fallback terms.
    */
@@ -749,7 +1176,26 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       }
     }
 
-    $stop = ['and', 'built', 'can', 'drupal', 'from', 'here', 'how', 'learn', 'power', 'site', 'that', 'the', 'this', 'unlock', 'what', 'with', 'you', 'your'];
+    $stop = [
+      'and',
+      'built',
+      'can',
+      'drupal',
+      'from',
+      'here',
+      'how',
+      'learn',
+      'power',
+      'site',
+      'that',
+      'the',
+      'this',
+      'unlock',
+      'what',
+      'with',
+      'you',
+      'your',
+    ];
     foreach (preg_split('/[^a-z0-9_]+/', strtolower($question)) ?: [] as $term) {
       if (strlen($term) > 2 && !in_array($term, $stop, TRUE) && str_contains($haystack, $term)) {
         return TRUE;

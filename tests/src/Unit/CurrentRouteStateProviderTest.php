@@ -46,6 +46,8 @@ final class CurrentRouteStateProviderTest extends UnitTestCase {
       ->willReturnCallback(static fn(string $route_name): bool => $route_name === 'node.add');
 
     $account = $this->createMock(AccountInterface::class);
+    $account->method('hasPermission')
+      ->willReturnCallback(static fn(string $permission): bool => $permission === 'create article content');
     $provider = new CurrentRouteStateProvider($route_match, $current_path, $router, $access_manager, $account);
 
     $state = $provider->getState(new GuidanceRequest(

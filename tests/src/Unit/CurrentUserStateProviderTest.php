@@ -11,6 +11,7 @@ use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Tests\UnitTestCase;
 use Drupal\ai_guidance\State\CurrentUserStateProvider;
 use Drupal\ai_guidance\Value\GuidanceRequest;
+use Drupal\user\PermissionHandlerInterface;
 
 /**
  * Tests current-user guidance state.
@@ -143,8 +144,47 @@ final class CurrentUserStateProviderTest extends UnitTestCase {
         'allowed_actions' => ['create', 'edit own'],
       ],
     ], $summary_by_role['content_editor']['content_type_permissions']);
-    $this->assertSame(['use editorial transition publish'], $summary_by_role['content_editor']['workflow_transitions']);
-    $this->assertSame(['use text format content_format'], $summary_by_role['content_editor']['text_formats']);
+    $this->assertSame(
+      ['use editorial transition publish'],
+      $summary_by_role['content_editor']['workflow_transitions'],
+    );
+    $this->assertSame(
+      ['use text format content_format'],
+      $summary_by_role['content_editor']['text_formats'],
+    );
+  }
+
+  /**
+   * Tests registry-derived restricted permissions.
+   */
+  public function testPermissionRegistryAddsRestrictedPermissions(): void {
+    $config_factory = $this->createMock(ConfigFactoryInterface::class);
+    $config_factory->method('listAll')->willReturn([]);
+
+    $permission_handler = $this->createMock(PermissionHandlerInterface::class);
+    $permission_handler->method('getPermissions')->willReturn([
+      'administer custom workflow' => [
+        'title' => 'Administer custom workflow',
+        'provider' => 'custom_workflow',
+        'restrict access' => TRUE,
+      ],
+      'use custom workflow' => [
+        'title' => 'Use custom workflow',
+        'provider' => 'custom_workflow',
+      ],
+    ]);
+
+    $current_user = $this->createMock(AccountProxyInterface::class);
+    $provider = new CurrentUserStateProvider($current_user, $config_factory, $permission_handler);
+
+    $state = $provider->getState(new GuidanceRequest(
+      'Why can I use the workflow but not administer it?',
+      $this->accountWithPermissions(['use custom workflow', 'administer custom workflow']),
+    ));
+
+    $this->assertContains('administer custom workflow', $state['user']['relevant_permissions']);
+    $this->assertArrayHasKey('administer custom workflow', $state['user']['relevant_permission_catalog']);
+    $this->assertTrue($state['user']['relevant_permission_catalog']['administer custom workflow']['restrict_access']);
   }
 
   /**
@@ -161,8 +201,16 @@ final class CurrentUserStateProviderTest extends UnitTestCase {
    *
    * @param string[] $permissions
    *   Granted permissions.
+   * @param string[] $roles
+   *   Granted roles.
    */
-  private function accountWithPermissions(array $permissions, array $roles = ['authenticated', 'content_editor']): AccountInterface {
+  private function accountWithPermissions(
+    array $permissions,
+    array $roles = [
+      'authenticated',
+      'content_editor',
+    ],
+  ): AccountInterface {
     $account = $this->createMock(AccountInterface::class);
     $account->method('isAuthenticated')->willReturn(TRUE);
     $account->method('getRoles')->willReturn($roles);

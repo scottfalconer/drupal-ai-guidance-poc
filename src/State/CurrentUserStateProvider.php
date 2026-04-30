@@ -8,6 +8,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\ai_guidance\Value\GuidanceRequest;
+use Drupal\user\PermissionHandlerInterface;
 
 /**
  * Provides access-safe current user state.
@@ -32,6 +33,7 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
   public function __construct(
     private readonly AccountProxyInterface $currentUser,
     private readonly ConfigFactoryInterface $configFactory,
+    private readonly ?PermissionHandlerInterface $permissionHandler = NULL,
   ) {
   }
 
@@ -40,8 +42,9 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
    */
   public function getState(GuidanceRequest $request): array {
     $account = $request->account ?? $this->currentUser;
+    $relevant_permission_catalog = $this->relevantPermissionCatalog();
     $permissions = [];
-    foreach (self::RELEVANT_PERMISSIONS as $permission) {
+    foreach (array_keys($relevant_permission_catalog) as $permission) {
       if ($account->hasPermission($permission)) {
         $permissions[] = $permission;
       }
@@ -51,6 +54,7 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
       'is_authenticated' => $account->isAuthenticated(),
       'roles' => $account->getRoles(),
       'relevant_permissions' => $permissions,
+      'relevant_permission_catalog' => $this->permissionCatalogForGrantedPermissions($permissions, $relevant_permission_catalog),
       'can_access_administration_pages' => $account->hasPermission('access administration pages'),
       'can_administer_ai' => $account->hasPermission('administer ai'),
       'can_administer_ai_providers' => $account->hasPermission('administer ai providers'),
@@ -76,6 +80,142 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
     return [
       'user' => $user,
     ];
+  }
+
+  /**
+   * Returns a compact catalog of relevant, registry-derived permissions.
+   *
+   * @return array<string, array<string, mixed>>
+   *   Permission metadata keyed by permission ID.
+   */
+  private function relevantPermissionCatalog(): array {
+    $catalog = [];
+    foreach (self::RELEVANT_PERMISSIONS as $permission) {
+      $catalog[$permission] = [
+        'title' => $permission,
+        'restrict_access' => $this->isKnownRestrictedPermission($permission),
+      ];
+    }
+
+    if ($this->permissionHandler === NULL) {
+      return $catalog;
+    }
+
+    try {
+      $permissions = $this->permissionHandler->getPermissions();
+    }
+    catch (\Throwable) {
+      return $catalog;
+    }
+
+    foreach ($permissions as $permission => $definition) {
+      $permission = (string) $permission;
+      if (!$this->permissionLooksRelevant($permission, (array) $definition)) {
+        continue;
+      }
+      $catalog[$permission] = [
+        'title' => $this->permissionDefinitionText($definition['title'] ?? $permission),
+        'description' => $this->permissionDefinitionText($definition['description'] ?? ''),
+        'provider' => $this->permissionDefinitionText($definition['provider'] ?? ''),
+        'restrict_access' => !empty($definition['restrict access']),
+      ];
+    }
+
+    ksort($catalog, SORT_STRING);
+    return $catalog;
+  }
+
+  /**
+   * Checks whether a permission definition is relevant to guidance answers.
+   *
+   * @param string $permission
+   *   Permission machine name.
+   * @param array<string, mixed> $definition
+   *   Permission definition.
+   */
+  private function permissionLooksRelevant(string $permission, array $definition): bool {
+    if (in_array($permission, self::RELEVANT_PERMISSIONS, TRUE)) {
+      return TRUE;
+    }
+    if (!empty($definition['restrict access'])) {
+      return TRUE;
+    }
+
+    $haystack = strtolower($permission . ' '
+      . $this->permissionDefinitionText($definition['title'] ?? '') . ' '
+      . $this->permissionDefinitionText($definition['description'] ?? '') . ' '
+      . $this->permissionDefinitionText($definition['provider'] ?? ''));
+    foreach ([
+      'administer',
+      'ai',
+      'assistant',
+      'configuration',
+      'permission',
+      'provider',
+      'publish',
+      'transition',
+      'workflow',
+    ] as $term) {
+      if (str_contains($haystack, $term)) {
+        return TRUE;
+      }
+    }
+
+    return FALSE;
+  }
+
+  /**
+   * Converts permission definition metadata into prompt-safe plain text.
+   */
+  private function permissionDefinitionText(mixed $value): string {
+    if (is_scalar($value) || $value === NULL) {
+      return (string) $value;
+    }
+    if (is_object($value) && method_exists($value, '__toString')) {
+      return (string) $value;
+    }
+    if (is_array($value)) {
+      $parts = [];
+      foreach ($value as $item) {
+        $text = $this->permissionDefinitionText($item);
+        if ($text !== '') {
+          $parts[] = $text;
+        }
+      }
+      return implode(' ', $parts);
+    }
+    return '';
+  }
+
+  /**
+   * Returns catalog metadata only for permissions granted to the current user.
+   *
+   * @param string[] $permissions
+   *   Granted relevant permissions.
+   * @param array<string, array<string, mixed>> $catalog
+   *   Relevant permission catalog.
+   *
+   * @return array<string, array<string, mixed>>
+   *   Granted permission metadata.
+   */
+  private function permissionCatalogForGrantedPermissions(array $permissions, array $catalog): array {
+    $granted = [];
+    foreach ($permissions as $permission) {
+      if (isset($catalog[$permission])) {
+        $granted[$permission] = $catalog[$permission];
+      }
+    }
+    return $granted;
+  }
+
+  /**
+   * Marks known high-risk permissions as restricted.
+   *
+   * @param string $permission
+   *   Permission machine name.
+   */
+  private function isKnownRestrictedPermission(string $permission): bool {
+    return str_starts_with($permission, 'administer ');
   }
 
   /**
@@ -190,6 +330,8 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
   /**
    * Builds role-first guidance for the current account.
    *
+   * @param \Drupal\Core\Session\AccountInterface $account
+   *   Current account.
    * @param array<string, mixed> $user
    *   Safe current-user state.
    *
@@ -201,7 +343,8 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
     foreach ((array) ($user['content_type_permissions'] ?? []) as $content_type) {
       $actions = (array) ($content_type['allowed_actions'] ?? []);
       if (array_intersect($actions, ['create', 'edit own', 'edit any']) !== []) {
-        $can[] = 'Create or edit `' . $content_type['type'] . '` content according to the listed content permissions.';
+        $can[] = 'Create or edit `' . $content_type['type']
+          . '` content according to the listed content permissions.';
       }
     }
     if ($account->hasPermission('access administration pages')) {
@@ -269,6 +412,7 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
    */
   private function roleCapabilitySummary(): array {
     $summaries = [];
+    $permission_catalog = $this->relevantPermissionCatalog();
     foreach ($this->configFactory->listAll('user.role.') as $name) {
       $data = $this->configFactory->get($name)->getRawData();
       $id = (string) ($data['id'] ?? substr($name, strlen('user.role.')));
@@ -277,6 +421,7 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
       }
 
       $permissions = array_values(array_map('strval', (array) ($data['permissions'] ?? [])));
+      $restricted_permissions = array_values(array_filter($permissions, static fn(string $permission): bool => !empty($permission_catalog[$permission]['restrict_access'])));
       $is_admin = !empty($data['is_admin']);
       $has_permission = static fn(string $permission): bool => $is_admin || in_array($permission, $permissions, TRUE);
       $workflow_transitions = array_values(array_filter($permissions, static fn(string $permission): bool => str_starts_with($permission, 'use ') && str_contains($permission, ' transition ')));
@@ -297,6 +442,7 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
         'content_type_permissions' => $this->contentTypePermissionsFromCheck($has_permission),
         'workflow_transitions' => array_slice($workflow_transitions, 0, 12),
         'text_formats' => array_slice($text_formats, 0, 8),
+        'restricted_permissions' => array_slice($restricted_permissions, 0, 12),
       ];
     }
 
