@@ -292,10 +292,6 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       return FALSE;
     }
 
-    if (array_intersect(['administrator', 'site_builder'], $account->getRoles()) !== []) {
-      return TRUE;
-    }
-
     foreach ([
       'administer ai guidance',
       'administer ai',

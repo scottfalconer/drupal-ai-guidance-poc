@@ -8,6 +8,7 @@ use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\ai_assistant_api\Attribute\AiAssistantAction;
+use Drupal\ai_guidance\Prompt\GuidanceRedactor;
 use Drupal\ai_guidance\Source\SiteConfigurationSourceProvider;
 use Drupal\ai_guidance\State\GuidanceStateAggregator;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -30,11 +31,12 @@ final class SiteConfigSummaryContextAction extends GuidanceReadOnlyActionBase {
     PrivateTempStoreFactory $tmpStore,
     AccountProxyInterface $currentUser,
     RequestStack $requestStack,
+    GuidanceRedactor $redactor,
     private readonly GuidanceStateAggregator $stateAggregator,
     private readonly SiteConfigurationSourceProvider $sourceProvider,
     private readonly ?object $siteArchitectureRepository = NULL,
   ) {
-    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack);
+    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack, $redactor);
   }
 
   /**
@@ -46,6 +48,7 @@ final class SiteConfigSummaryContextAction extends GuidanceReadOnlyActionBase {
       $container->get('tempstore.private'),
       $container->get('current_user'),
       $container->get('request_stack'),
+      $container->get('ai_guidance.redactor'),
       $container->get('ai_guidance.state_aggregator'),
       $container->get(SiteConfigurationSourceProvider::class),
       $container->has('ai_context_site_architecture.contract_repository') ? $container->get('ai_context_site_architecture.contract_repository') : NULL,

@@ -32,15 +32,16 @@ final class CurrentRouteStateProvider implements GuidanceStateProviderInterface 
    */
   public function getState(GuidanceRequest $request): array {
     $context_path = $request->getContextValue('current_route');
-    $path = is_string($context_path) && $context_path !== '' ? $context_path : $this->currentPath->getPath();
+    $safe_context_path = $this->sanitizeContextPath($context_path);
+    $path = $safe_context_path ?? $this->currentPath->getPath();
     $route_name = $this->routeMatch->getRouteName();
     $route_parameters = $this->routeMatch->getRawParameters()->all();
     $resolved_from_context = FALSE;
     $requested_path_access = NULL;
     $account = $request->account ?? $this->currentUser;
 
-    if (is_string($context_path) && str_starts_with($context_path, '/')) {
-      $match_path = parse_url($context_path, PHP_URL_PATH) ?: $context_path;
+    if ($safe_context_path !== NULL) {
+      $match_path = $safe_context_path;
       try {
         $parameters = $this->router->match($match_path);
         if (!empty($parameters['_route'])) {
@@ -71,13 +72,44 @@ final class CurrentRouteStateProvider implements GuidanceStateProviderInterface 
         'access_allowed' => $route_name ? $this->accessForPathOrRoute($path, $route_name, $route_parameters, $account) : NULL,
       ],
       'request_context' => [
-        'source' => $context_path ? 'caller_context' : 'current_request',
+        'source' => $safe_context_path !== NULL ? 'caller_context' : 'current_request',
         'route_resolved_from_context' => $resolved_from_context,
         'requested_path_access' => $requested_path_access,
       ],
     ] + ($this->pathAccessQuestion($request->question) ? [
       'common_path_access' => $this->commonPathAccess($path, $request->question, $account),
     ] : []);
+  }
+
+  /**
+   * Returns a safe local path from caller context.
+   */
+  private function sanitizeContextPath(mixed $path): ?string {
+    if (!is_string($path)) {
+      return NULL;
+    }
+
+    $path = trim($path);
+    if ($path === ''
+      || !str_starts_with($path, '/')
+      || str_starts_with($path, '//')
+      || str_contains($path, '\\')
+      || preg_match('/[[:cntrl:]]/', $path)
+    ) {
+      return NULL;
+    }
+
+    $parts = parse_url($path);
+    if ($parts === FALSE || isset($parts['scheme']) || isset($parts['host'])) {
+      return NULL;
+    }
+
+    $safe_path = (string) ($parts['path'] ?? '');
+    if ($safe_path === '' || !str_starts_with($safe_path, '/')) {
+      return NULL;
+    }
+
+    return $safe_path;
   }
 
   /**

@@ -10,6 +10,7 @@ use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\ai_assistant_api\Base\AiAssistantActionBase;
+use Drupal\ai_guidance\Prompt\GuidanceRedactor;
 use Drupal\ai_guidance\Value\GuidanceRequest;
 use Drupal\ai_guidance\Value\GuidanceSource;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -45,6 +46,7 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
     PrivateTempStoreFactory $tmpStore,
     protected readonly AccountProxyInterface $currentUser,
     protected readonly RequestStack $requestStack,
+    protected readonly GuidanceRedactor $redactor,
   ) {
     parent::__construct($configuration, $tmpStore);
   }
@@ -235,6 +237,10 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
    *
    * @param \Drupal\ai_guidance\Value\GuidanceSource[] $sources
    *   Source objects.
+   * @param string $prefix
+   *   Display citation ID prefix.
+   * @param int $limit
+   *   Maximum number of sources to format.
    *
    * @return string[]
    *   Context description lines.
@@ -257,6 +263,7 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
       if (!$source instanceof GuidanceSource) {
         continue;
       }
+      $source = $this->redactSource($source);
       $citation_id = $prefix . ($index + 1);
       $url = $this->sourceUrl($source);
       $source_bullet = $url
@@ -277,11 +284,67 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
   }
 
   /**
+   * Redacts a trusted source before formatting it for model-visible context.
+   */
+  private function redactSource(GuidanceSource $source): GuidanceSource {
+    $title = $this->redactor->redactText($source->title)['value'];
+    $text = $this->redactor->redactText($source->text)['value'];
+    $citations = $this->redactor->redactArray($source->citations)['value'];
+    $metadata = $this->redactor->redactArray($source->metadata)['value'];
+    $access_notes = $this->redactor->redactArray($source->accessNotes)['value'];
+
+    return new GuidanceSource(
+      id: $source->id,
+      canonicalId: $source->canonicalId,
+      title: is_string($title) ? $title : $source->title,
+      type: $source->type,
+      text: is_string($text) ? $text : '',
+      priority: $source->priority,
+      citations: is_array($citations) ? $citations : [],
+      metadata: is_array($metadata) ? $metadata : [],
+      accessNotes: is_array($access_notes) ? $access_notes : [],
+      cacheability: $source->cacheability,
+      tokenEstimate: GuidanceSource::estimateTokens(is_string($text) ? $text : ''),
+      citationId: $source->citationId,
+    );
+  }
+
+  /**
    * Gets a source URL, when available.
    */
   protected function sourceUrl(GuidanceSource $source): ?string {
     $url = $source->citations['url'] ?? $source->metadata['source_url'] ?? NULL;
-    return is_string($url) && $url !== '' ? $url : NULL;
+    if (!is_string($url)) {
+      return NULL;
+    }
+
+    $url = trim($url);
+    if ($url === '') {
+      return NULL;
+    }
+
+    $parts = parse_url($url);
+    if ($parts === FALSE) {
+      return NULL;
+    }
+
+    if (str_starts_with($url, '//')) {
+      return NULL;
+    }
+
+    if (str_starts_with($url, '/')) {
+      $path = (string) ($parts['path'] ?? '');
+      return str_starts_with($path, '/') ? $path : NULL;
+    }
+
+    $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+    $host = (string) ($parts['host'] ?? '');
+    if (!in_array($scheme, ['http', 'https'], TRUE) || $host === '') {
+      return NULL;
+    }
+
+    $path = (string) ($parts['path'] ?? '');
+    return $scheme . '://' . $host . $path;
   }
 
   /**

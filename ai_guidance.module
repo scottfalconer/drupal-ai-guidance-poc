@@ -17,3 +17,75 @@ function ai_guidance_help($route_name, RouteMatchInterface $route_match) {
 
   return NULL;
 }
+
+/**
+ * Implements hook_requirements().
+ */
+function ai_guidance_requirements($phase) {
+  if ($phase !== 'runtime') {
+    return [];
+  }
+
+  $has_context_support = ai_guidance_has_ai_assistant_context_support();
+  return [
+    'ai_guidance_ai_assistant_api_context_support' => [
+      'title' => t('AI Guidance AI Assistant API support'),
+      'value' => $has_context_support ? t('Detected') : t('Not detected'),
+      'severity' => $has_context_support ? REQUIREMENT_OK : REQUIREMENT_WARNING,
+      'description' => $has_context_support
+        ? t('AI Assistant API appears to support enabled read-only context actions for context-only assistants.')
+        : t('AI Guidance needs AI Assistant API support for enabled read-only context actions. Apply patches/ai-assistant-api-context-actions.patch or use an AI module version with equivalent behavior before using the demo assistant broadly.'),
+    ],
+  ];
+}
+
+/**
+ * Detects the temporary AI Assistant API context-only support needed by the POC.
+ */
+function ai_guidance_has_ai_assistant_context_support() {
+  $manager_class = 'Drupal\ai_assistant_api\AiAssistantActionPluginManager';
+  if (!class_exists($manager_class) || !method_exists($manager_class, 'listAllContexts')) {
+    return FALSE;
+  }
+
+  try {
+    $manager_method = new \ReflectionMethod($manager_class, 'listAllContexts');
+  }
+  catch (\ReflectionException $exception) {
+    return FALSE;
+  }
+
+  if ($manager_method->getNumberOfParameters() < 3) {
+    return FALSE;
+  }
+
+  $manager_file = $manager_method->getFileName();
+  $manager_source = is_string($manager_file) && is_readable($manager_file) ? file_get_contents($manager_file) : '';
+  if (!is_string($manager_source)
+    || !str_contains($manager_source, '$configs ?: $assistant->get(\'actions_enabled\')')
+    || !str_contains($manager_source, 'array_key_exists($definition[\'id\'], $enabled_actions)')
+  ) {
+    return FALSE;
+  }
+
+  $runner_class = 'Drupal\ai_assistant_api\AiAssistantApiRunner';
+  if (!class_exists($runner_class)) {
+    return FALSE;
+  }
+
+  try {
+    $runner_reflection = new \ReflectionClass($runner_class);
+  }
+  catch (\ReflectionException $exception) {
+    return FALSE;
+  }
+
+  $runner_file = $runner_reflection->getFileName();
+  $runner_source = is_string($runner_file) && is_readable($runner_file) ? file_get_contents($runner_file) : '';
+  if (!is_string($runner_source)) {
+    return FALSE;
+  }
+
+  return !str_contains($runner_source, 'No actions have been run')
+    || str_contains($runner_source, 'listAllActions($this->assistant->get(\'actions_enabled\')) !== []');
+}

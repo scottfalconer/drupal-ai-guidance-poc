@@ -5,5 +5,5 @@ type: module
 core_version_requirement: ^10.5 || ^11.2
 
 dependencies:
-  - ai:ai_guidance
+  - ai_guidance:ai_guidance
   - ai_context:ai_context

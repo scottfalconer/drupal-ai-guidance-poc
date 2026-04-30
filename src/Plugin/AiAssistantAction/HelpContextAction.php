@@ -8,6 +8,7 @@ use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\ai_assistant_api\Attribute\AiAssistantAction;
+use Drupal\ai_guidance\Prompt\GuidanceRedactor;
 use Drupal\ai_guidance\Source\HelpTopicsSourceProvider;
 use Drupal\ai_guidance\Source\HookHelpSourceProvider;
 use Drupal\ai_guidance\State\GuidanceStateAggregator;
@@ -32,11 +33,12 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
     PrivateTempStoreFactory $tmpStore,
     AccountProxyInterface $currentUser,
     RequestStack $requestStack,
+    GuidanceRedactor $redactor,
     private readonly GuidanceStateAggregator $stateAggregator,
     private readonly HookHelpSourceProvider $hookHelpSourceProvider,
     private readonly HelpTopicsSourceProvider $helpTopicsSourceProvider,
   ) {
-    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack);
+    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack, $redactor);
   }
 
   /**
@@ -48,6 +50,7 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
       $container->get('tempstore.private'),
       $container->get('current_user'),
       $container->get('request_stack'),
+      $container->get('ai_guidance.redactor'),
       $container->get('ai_guidance.state_aggregator'),
       $container->get(HookHelpSourceProvider::class),
       $container->get(HelpTopicsSourceProvider::class),
@@ -85,6 +88,8 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
    *
    * @param \Drupal\ai_guidance\Value\GuidanceSource[] $sources
    *   Candidate sources.
+   * @param string $question
+   *   Current user question.
    *
    * @return \Drupal\ai_guidance\Value\GuidanceSource[]
    *   Selected sources.

@@ -155,6 +155,28 @@ final class CurrentUserStateProviderTest extends UnitTestCase {
   }
 
   /**
+   * Tests administrator role names alone do not unlock role matrix inspection.
+   */
+  public function testAdministratorRoleWithoutPermissionCannotInspectRoleMatrix(): void {
+    $config_factory = $this->createMock(ConfigFactoryInterface::class);
+    $config_factory->method('listAll')->willReturn([]);
+
+    $current_user = $this->createMock(AccountProxyInterface::class);
+    $provider = new CurrentUserStateProvider($current_user, $config_factory);
+
+    $state = $provider->getState(new GuidanceRequest(
+      'Compare what anonymous, content editor, and administrator can do on this page.',
+      $this->accountWithPermissions([], ['authenticated', 'administrator']),
+    ));
+
+    $this->assertArrayNotHasKey('role_capability_summary', $state['user']);
+    $this->assertSame(
+      'Current account cannot inspect the full role permission matrix; answer from current user state and ask an administrator to review /admin/people/roles when cross-role comparison is needed.',
+      $state['user']['role_capability_note'],
+    );
+  }
+
+  /**
    * Tests registry-derived restricted permissions.
    */
   public function testPermissionRegistryAddsRestrictedPermissions(): void {

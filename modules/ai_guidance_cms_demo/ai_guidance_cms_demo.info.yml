@@ -6,6 +6,6 @@ core_version_requirement: ^10.5 || ^11.2
 configure: ai_guidance_cms_demo.setup
 
 dependencies:
-  - ai:ai_guidance
+  - ai_guidance:ai_guidance
   - ai:ai_assistant_api
   - ai:ai_chatbot

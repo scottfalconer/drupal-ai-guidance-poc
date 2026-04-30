@@ -9,6 +9,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\ai_assistant_api\Attribute\AiAssistantAction;
 use Drupal\ai_guidance\Plugin\AiAssistantAction\GuidanceReadOnlyActionBase;
+use Drupal\ai_guidance\Prompt\GuidanceRedactor;
 use Drupal\ai_guidance\State\GuidanceStateAggregator;
 use Drupal\ai_guidance_best_practices\Source\BestPracticesSourceProvider;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -31,10 +32,11 @@ final class BestPracticesContextAction extends GuidanceReadOnlyActionBase {
     PrivateTempStoreFactory $tmpStore,
     AccountProxyInterface $currentUser,
     RequestStack $requestStack,
+    GuidanceRedactor $redactor,
     private readonly GuidanceStateAggregator $stateAggregator,
     private readonly BestPracticesSourceProvider $sourceProvider,
   ) {
-    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack);
+    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack, $redactor);
   }
 
   /**
@@ -46,6 +48,7 @@ final class BestPracticesContextAction extends GuidanceReadOnlyActionBase {
       $container->get('tempstore.private'),
       $container->get('current_user'),
       $container->get('request_stack'),
+      $container->get('ai_guidance.redactor'),
       $container->get('ai_guidance.state_aggregator'),
       $container->get(BestPracticesSourceProvider::class),
     );
@@ -119,6 +122,8 @@ final class BestPracticesContextAction extends GuidanceReadOnlyActionBase {
    *
    * @param \Drupal\ai_guidance\Value\GuidanceSource[] $sources
    *   Candidate sources.
+   * @param string $question
+   *   Current user question.
    *
    * @return \Drupal\ai_guidance\Value\GuidanceSource[]
    *   Selected sources.

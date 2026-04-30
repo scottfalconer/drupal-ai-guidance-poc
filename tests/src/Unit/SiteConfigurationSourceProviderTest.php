@@ -133,6 +133,59 @@ final class SiteConfigurationSourceProviderTest extends UnitTestCase {
   }
 
   /**
+   * Tests role IDs alone do not unlock full configuration summaries.
+   */
+  public function testAdministratorRoleWithoutPermissionReceivesLimitedSummary(): void {
+    $config_factory = $this->createMock(ConfigFactoryInterface::class);
+    $config_factory->method('get')
+      ->willReturnCallback(fn(string $name): ImmutableConfig => match ($name) {
+        'system.site' => $this->config([
+          'name' => 'Umami',
+          'page.front' => '/page/1',
+        ]),
+        'system.theme' => $this->config(['default' => 'olivero']),
+        'node.type.article' => $this->config([
+          'type' => 'article',
+          'name' => 'Article',
+          'description' => 'Editorial content.',
+        ]),
+        'views.view.frontpage' => $this->config([
+          'id' => 'frontpage',
+          'label' => 'Front page',
+        ]),
+        default => $this->config([]),
+      });
+    $config_factory->method('listAll')
+      ->willReturnCallback(static fn(string $prefix): array => match ($prefix) {
+        'node.type.' => ['node.type.article'],
+        'views.view.' => ['views.view.frontpage'],
+        'canvas.component.' => ['canvas.component.hero'],
+        default => [],
+      });
+
+    $entity_type_manager = $this->createMock(EntityTypeManagerInterface::class);
+    $entity_type_manager->expects($this->never())->method('getStorage');
+
+    $alias_manager = $this->createMock(AliasManagerInterface::class);
+    $alias_manager->method('getAliasByPath')->with('/page/1')->willReturn('/home');
+
+    $provider = new SiteConfigurationSourceProvider($config_factory, $entity_type_manager, $alias_manager);
+    $request = new GuidanceRequest(
+      'I just made this page. How can I add it to the items shown on the front page?',
+      $this->accountWithPermissions(['create article content'], ['authenticated', 'administrator']),
+    );
+
+    $sources = iterator_to_array($provider->getSources($request, new GuidanceState([])));
+
+    $this->assertCount(1, $sources);
+    $this->assertStringContainsString('# Limited site configuration summary', $sources[0]->text);
+    $this->assertStringContainsString('- Front page: `/home`.', $sources[0]->text);
+    $this->assertStringNotContainsString('Default theme', $sources[0]->text);
+    $this->assertStringNotContainsString('frontpage', $sources[0]->text);
+    $this->assertStringNotContainsString('canvas.component.hero', $sources[0]->text);
+  }
+
+  /**
    * Tests outside-agent questions do not receive beginner exercises.
    */
   public function testAgentHandoffDoesNotIncludeBeginnerExercise(): void {

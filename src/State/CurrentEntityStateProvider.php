@@ -7,7 +7,6 @@ namespace Drupal\ai_guidance\State;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\Core\Session\AccountInterface;
 use Drupal\ai_guidance\Value\GuidanceRequest;
 
 /**
@@ -17,7 +16,6 @@ final class CurrentEntityStateProvider implements GuidanceStateProviderInterface
 
   public function __construct(
     private readonly RouteMatchInterface $routeMatch,
-    private readonly AccountInterface $currentUser,
   ) {
   }
 

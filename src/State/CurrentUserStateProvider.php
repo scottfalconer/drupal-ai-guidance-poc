@@ -397,11 +397,7 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
    * Checks whether the current account may inspect the role matrix.
    */
   private function canInspectRoleMatrix(AccountInterface $account): bool {
-    if ($account->hasPermission('administer permissions')) {
-      return TRUE;
-    }
-
-    return in_array('administrator', $account->getRoles(), TRUE);
+    return $account->hasPermission('administer permissions');
   }
 
   /**

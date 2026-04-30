@@ -9,6 +9,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\ai_assistant_api\Attribute\AiAssistantAction;
 use Drupal\ai_guidance\Evidence\GuidanceEvidenceCollector;
+use Drupal\ai_guidance\Prompt\GuidanceRedactor;
 use Drupal\ai_guidance\State\AiFeatureStatusProvider;
 use Drupal\ai_guidance\State\GuidanceStateAggregator;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -31,11 +32,12 @@ final class SiteStateContextAction extends GuidanceReadOnlyActionBase {
     PrivateTempStoreFactory $tmpStore,
     AccountProxyInterface $currentUser,
     RequestStack $requestStack,
+    GuidanceRedactor $redactor,
     private readonly GuidanceStateAggregator $stateAggregator,
     private readonly AiFeatureStatusProvider $featureStatusProvider,
     private readonly GuidanceEvidenceCollector $evidenceCollector,
   ) {
-    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack);
+    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack, $redactor);
   }
 
   /**
@@ -47,6 +49,7 @@ final class SiteStateContextAction extends GuidanceReadOnlyActionBase {
       $container->get('tempstore.private'),
       $container->get('current_user'),
       $container->get('request_stack'),
+      $container->get('ai_guidance.redactor'),
       $container->get('ai_guidance.state_aggregator'),
       $container->get(AiFeatureStatusProvider::class),
       $container->get('ai_guidance.evidence_collector'),

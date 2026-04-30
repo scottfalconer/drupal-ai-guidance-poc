@@ -51,7 +51,6 @@ services:
   Drupal\ai_guidance\State\CurrentEntityStateProvider:
     arguments:
       $routeMatch: '@current_route_match'
-      $currentUser: '@current_user'
     tags:
       - { name: guidance_state_provider, priority: 90 }
 
