@@ -1,0 +1,14 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+
+  ai_guidance_cms_demo.setup_manager:
+    class: Drupal\ai_guidance_cms_demo\Service\GuidanceAssistantSetupManager
+    arguments:
+      $entityTypeManager: '@entity_type.manager'
+      $providerPluginManager: '@ai.provider'
+      $moduleHandler: '@module_handler'
+      $appRoot: '%app.root%'
+
+  Drupal\ai_guidance_cms_demo\Service\GuidanceAssistantSetupManager: '@ai_guidance_cms_demo.setup_manager'

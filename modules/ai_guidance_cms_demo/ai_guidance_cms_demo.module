@@ -1,0 +1,26 @@
+<?php
+
+use Drupal\Core\Routing\RouteMatchInterface;
+
+/**
+ * Implements hook_help().
+ */
+function ai_guidance_cms_demo_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.ai_guidance_cms_demo':
+      return '<p>'
+        . t('This module sets up a read-only Drupal AI assistant for contextual site help.')
+        . '</p><p>'
+        . t('It creates or updates one dedicated assistant and enables no mutation-capable actions.')
+        . '</p>';
+
+    case 'ai_guidance_cms_demo.setup':
+      return '<p>'
+        . t('This page manages the read-only Drupal AI assistant demo. Use the Refresh demo assistant button, then open chat and try the prompts below.')
+        . ' '
+        . t('In V1, the assistant gives cited guidance and safe manual steps. It cannot create content, change configuration, alter permissions, or execute tools.')
+        . '</p>';
+  }
+
+  return NULL;
+}

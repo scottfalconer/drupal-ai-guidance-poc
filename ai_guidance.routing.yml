@@ -1,0 +1,7 @@
+ai_guidance.debug:
+  path: '/admin/config/ai/guidance/debug'
+  defaults:
+    _controller: '\Drupal\ai_guidance\Controller\GuidanceDebugController::debug'
+    _title: 'AI guidance debug'
+  requirements:
+    _permission: 'administer ai guidance'

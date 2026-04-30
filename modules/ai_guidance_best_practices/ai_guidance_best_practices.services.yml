@@ -1,0 +1,9 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+
+  Drupal\ai_guidance_best_practices\Source\BestPracticesSourceProvider:
+    arguments:
+      $parser: '@ai_guidance.markdown_parser'
+      $appRoot: '%app.root%'

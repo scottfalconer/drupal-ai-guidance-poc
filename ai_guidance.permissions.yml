@@ -1,0 +1,4 @@
+administer ai guidance:
+  title: 'Administer AI guidance'
+  description: 'View AI guidance debug output and configuration.'
+  restrict access: true

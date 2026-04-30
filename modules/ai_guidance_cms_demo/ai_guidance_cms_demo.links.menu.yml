@@ -1,0 +1,6 @@
+ai_guidance_cms_demo.setup:
+  title: 'Guidance Assistant demo'
+  description: 'Refresh and test the read-only Drupal Guidance Assistant.'
+  parent: ai.admin_settings
+  route_name: ai_guidance_cms_demo.setup
+  weight: 91

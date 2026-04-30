@@ -1,0 +1,9 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+
+  Drupal\ai_guidance_ai_context\Source\AiContextSourceProvider:
+    arguments:
+      $selector: '@ai_context.selector'
+      $siteArchitectureRepository: '@?ai_context_site_architecture.contract_repository'

@@ -1,0 +1,21 @@
+---
+label: 'Safe AI configuration for content editors'
+top_level: false
+---
+<h2>{% trans %}Safe rollout model{% endtrans %}</h2>
+<p>{% trans %}Use a staged rollout when enabling Drupal AI features for content editors. Start by confirming that a chat provider is configured and that only the AI features needed by editors are available to their role.{% endtrans %}</p>
+
+<h2>{% trans %}Where to configure editor access{% endtrans %}</h2>
+<p>{% trans %}Review editor permissions at <code>/admin/people/permissions</code>. Grant only the narrow permissions needed for the editor-facing AI feature being tested, such as the installed chat access permission for an AI chatbot or <code>use ai ckeditor</code> for the CKEditor AI plugin when those modules are installed.{% endtrans %}</p>
+
+<h2>{% trans %}Keep administrator controls restricted{% endtrans %}</h2>
+<p>{% trans %}Keep provider setup, model selection, permission administration, prompt and system configuration, and site-wide automation controls administrator-only. Do not grant content editors <code>administer ai</code>, <code>administer ai providers</code>, <code>administer ai_assistant</code>, <code>administer permissions</code>, or <code>administer site configuration</code>; those permissions expose provider setup, assistant configuration, permission management, or broader site administration.{% endtrans %}</p>
+
+<h2>{% trans %}Prefer narrow editor workflows{% endtrans %}</h2>
+<p>{% trans %}For editors, prefer narrow workflows: drafting copy, revising tone, summarizing content, suggesting metadata, and getting help on the current admin page. Test these workflows on draft content before broad rollout.{% endtrans %}</p>
+
+<h2>{% trans %}Use site policy context when available{% endtrans %}</h2>
+<p>{% trans %}If Context Control Center is available, add site-specific guidance for brand voice, editorial standards, accessibility expectations, regulatory constraints, and workflow governance. Treat this context as site policy that guides AI output, not as a substitute for permissions or editorial review.{% endtrans %}</p>
+
+<h2>{% trans %}Before launch{% endtrans %}</h2>
+<p>{% trans %}Before launch, test with a content editor account, verify the assistant does not expose admin-only configuration, and confirm the assistant distinguishes guidance from actions it cannot perform. A useful verification check is to log in as a content editor, open the editor-facing chat or editing UI, and confirm the same account cannot access <code>/admin/config/ai</code>, <code>/admin/config/ai/providers</code>, or <code>/admin/config/ai/ai-assistant</code>.{% endtrans %}</p>

@@ -1,0 +1,19 @@
+<?php
+
+use Drupal\Core\Routing\RouteMatchInterface;
+
+/**
+ * Implements hook_help().
+ */
+function ai_guidance_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.ai_guidance':
+      return '<p>' . t('AI Guidance provides read-only context actions for the existing Drupal AI Assistant. It exposes safe site state, local Help sources, optional site context, and trusted guidance documents. It does not execute tools or mutate the site.') . '</p>';
+
+    case 'ai_guidance.debug':
+      return '<p>' . t('This debug page shows the read-only AI Assistant contexts for a sample question. Use it to inspect safe state, selected sources, citations, access notes, redactions, and context text before testing the chat experience.') . '</p>'
+        . '<p>' . t('The debug output is for administrators and is not a custom chat UI. It should help confirm what evidence the model receives without exposing secrets, provider credentials, raw prompt templates, or hidden assistant configuration.') . '</p>';
+  }
+
+  return NULL;
+}

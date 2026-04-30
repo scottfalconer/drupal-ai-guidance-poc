@@ -1,0 +1,4 @@
+administer ai guidance cms demo:
+  title: 'Administer AI guidance CMS demo'
+  description: 'Create or update the read-only Drupal Guidance Assistant demo.'
+  restrict access: true

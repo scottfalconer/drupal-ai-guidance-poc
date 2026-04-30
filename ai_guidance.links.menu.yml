@@ -1,0 +1,6 @@
+ai_guidance.debug:
+  title: 'AI guidance debug'
+  description: 'Inspect the read-only AI Assistant guidance contexts for a sample question.'
+  parent: ai.admin_settings
+  route_name: ai_guidance.debug
+  weight: 90

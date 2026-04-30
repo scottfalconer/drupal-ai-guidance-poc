@@ -1,0 +1,7 @@
+ai_guidance_cms_demo.setup:
+  path: '/admin/config/ai/guidance/demo'
+  defaults:
+    _form: '\Drupal\ai_guidance_cms_demo\Form\GuidanceDemoSetupForm'
+    _title: 'Drupal Guidance Assistant'
+  requirements:
+    _permission: 'administer ai guidance cms demo'

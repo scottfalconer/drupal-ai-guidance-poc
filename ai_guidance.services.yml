@@ -1,0 +1,68 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+
+  ai_guidance.redactor:
+    class: Drupal\ai_guidance\Prompt\GuidanceRedactor
+
+  ai_guidance.markdown_parser:
+    class: Drupal\ai_guidance\Source\MarkdownGuidanceParser
+
+  ai_guidance.state_aggregator:
+    class: Drupal\ai_guidance\State\GuidanceStateAggregator
+    arguments:
+      $providers: !tagged_iterator guidance_state_provider
+      $redactor: '@ai_guidance.redactor'
+
+  Drupal\ai_guidance\State\CurrentRouteStateProvider:
+    arguments:
+      $routeMatch: '@current_route_match'
+      $currentPath: '@path.current'
+      $router: '@router.no_access_checks'
+      $accessManager: '@access_manager'
+      $currentUser: '@current_user'
+    tags:
+      - { name: guidance_state_provider, priority: 100 }
+
+  Drupal\ai_guidance\State\CurrentEntityStateProvider:
+    arguments:
+      $routeMatch: '@current_route_match'
+      $currentUser: '@current_user'
+    tags:
+      - { name: guidance_state_provider, priority: 90 }
+
+  Drupal\ai_guidance\State\CurrentUserStateProvider:
+    arguments:
+      $currentUser: '@current_user'
+      $configFactory: '@config.factory'
+    tags:
+      - { name: guidance_state_provider, priority: 80 }
+
+  Drupal\ai_guidance\State\EnabledModulesStateProvider:
+    arguments:
+      $moduleHandler: '@module_handler'
+    tags:
+      - { name: guidance_state_provider, priority: 70 }
+
+  Drupal\ai_guidance\State\AiFeatureStatusProvider:
+    arguments:
+      $providerPluginManager: '@ai.provider'
+      $moduleHandler: '@module_handler'
+
+  Drupal\ai_guidance\Source\HookHelpSourceProvider:
+    arguments:
+      $moduleHandler: '@module_handler'
+      $routeMatch: '@current_route_match'
+      $renderer: '@renderer'
+
+  Drupal\ai_guidance\Source\HelpTopicsSourceProvider:
+    arguments:
+      $helpTopicPluginManager: '@plugin.manager.help_topic'
+      $renderer: '@renderer'
+
+  Drupal\ai_guidance\Source\SiteConfigurationSourceProvider:
+    arguments:
+      $configFactory: '@config.factory'
+      $entityTypeManager: '@entity_type.manager'
+      $aliasManager: '@?path_alias.manager'

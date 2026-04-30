@@ -1,0 +1,162 @@
+diff --git a/modules/ai_assistant_api/src/AiAssistantActionPluginManager.php b/modules/ai_assistant_api/src/AiAssistantActionPluginManager.php
+index b4b2dc5c7..e6db4e272 100644
+--- a/modules/ai_assistant_api/src/AiAssistantActionPluginManager.php
++++ b/modules/ai_assistant_api/src/AiAssistantActionPluginManager.php
+@@ -55,6 +55,9 @@ final class AiAssistantActionPluginManager extends DefaultPluginManager {
+   public function listAllUsageInstructions($configs = []): array {
+     $instructions = [];
+     foreach ($this->getDefinitions() as $definition) {
++      if (!array_key_exists($definition['id'], (array) $configs)) {
++        continue;
++      }
+       $instance = $this->createInstance($definition['id'], $configs[$definition['id']] ?? []);
+       foreach ($instance->listUsageInstructions() as $instruction) {
+         $instructions[] = $instruction;
+@@ -75,6 +78,9 @@ final class AiAssistantActionPluginManager extends DefaultPluginManager {
+   public function listAllActions($configs = []): array {
+     $actions = [];
+     foreach ($this->getDefinitions() as $definition) {
++      if (!array_key_exists($definition['id'], (array) $configs)) {
++        continue;
++      }
+       $instance = $this->createInstance($definition['id'], $configs[$definition['id']] ?? []);
+       foreach ($instance->listActions() as $actionId => $action) {
+         $actions[$actionId] = $action;
+@@ -98,11 +104,12 @@ final class AiAssistantActionPluginManager extends DefaultPluginManager {
+    */
+   public function listAllContexts(AiAssistantInterface $assistant, string $thread_id, $configs = []): array {
+     $contexts = [];
++    $enabled_actions = (array) ($configs ?: $assistant->get('actions_enabled'));
+     foreach ($this->getDefinitions() as $definition) {
+-      if (!in_array($definition['id'], $assistant->get('actions_enabled'))) {
++      if (!array_key_exists($definition['id'], $enabled_actions)) {
+         continue;
+       }
+-      $instance = $this->createInstance($definition['id'], $configs[$definition['id']] ?? []);
++      $instance = $this->createInstance($definition['id'], $enabled_actions[$definition['id']] ?? []);
+       $instance->setThreadId($thread_id);
+       $instance->setAssistant($assistant);
+       $contexts = array_merge($contexts, $instance->listContexts());
+diff --git a/modules/ai_assistant_api/src/AiAssistantApiRunner.php b/modules/ai_assistant_api/src/AiAssistantApiRunner.php
+index ee7cdf9f9..7401e2e31 100644
+--- a/modules/ai_assistant_api/src/AiAssistantApiRunner.php
++++ b/modules/ai_assistant_api/src/AiAssistantApiRunner.php
+@@ -344,7 +344,8 @@ class AiAssistantApiRunner {
+         $path = $this->moduleHandler->getModule('ai_assistant_api')->getPath() . '/resources/';
+         $system_prompt = file_get_contents($path . 'system_prompt.txt');
+       }
+-      if ($system_prompt) {
++      $actions = $this->actions->listAllActions($this->assistant->get('actions_enabled'));
++      if ($system_prompt && count($actions)) {
+         $return = $this->assistantMessage(TRUE);
+ 
+         // If it's a normal response, we just return it.
+@@ -463,10 +464,11 @@ class AiAssistantApiRunner {
+     $this->eventDispatcher->dispatch($event, AiAssistantSystemRoleEvent::EVENT_NAME);
+     $assistant_message = $event->getSystemPrompt();
+ 
+-    // Set context messages from the actions.
+-    if (!empty($this->getOutputContexts())) {
++    // Set context messages from executable actions.
++    $output_contexts = $this->getOutputContexts();
++    if (!empty($output_contexts)) {
+       $message = '';
+-      foreach ($this->getOutputContexts() as $key => $data) {
++      foreach ($output_contexts as $key => $data) {
+         $message .= "The following are the results the different actions from the $key action: \n";
+         foreach ($data as $item) {
+           $message .= $item . "\n";
+@@ -474,9 +476,12 @@ class AiAssistantApiRunner {
+         $message .= "\n";
+       }
+     }
+-    else {
++    elseif ($this->actions->listAllActions($this->assistant->get('actions_enabled')) !== []) {
+       $message = "No actions have been run, this means that you have done nothing since the last instruction.";
+     }
++    else {
++      $message = '';
++    }
+     $assistant_message = $assistant_message . $message;
+ 
+     $messages = [];
+@@ -526,9 +531,12 @@ class AiAssistantApiRunner {
+     }
+     $response = $this->promptJsonDecoder->decode($values, 20);
+ 
+-    if (is_array($response)) {
++    if ($pre_prompt && is_array($response)) {
+       return $response;
+     }
++    if (is_array($response)) {
++      return new ChatOutput($values, $values, []);
++    }
+     return new ChatOutput($response, $values, []);
+   }
+ 
+diff --git a/modules/ai_assistant_api/src/Service/AssistantMessageBuilder.php b/modules/ai_assistant_api/src/Service/AssistantMessageBuilder.php
+index 27cc61293..9f6363fe4 100644
+--- a/modules/ai_assistant_api/src/Service/AssistantMessageBuilder.php
++++ b/modules/ai_assistant_api/src/Service/AssistantMessageBuilder.php
+@@ -125,7 +125,7 @@ class AssistantMessageBuilder {
+     $assistant_message = str_replace('[instructions]', $instructions, $assistant_message);
+ 
+     // If the pre-prompt message should be included and it exists, replace it.
+-    $pre_prompt_content = $this->prePrompt();
++    $pre_prompt_content = $include_pre_prompt ? $this->prePrompt() : '';
+     $pre_prompt = ($include_pre_prompt && $pre_prompt_content) ? $pre_prompt_content : '';
+     $assistant_message = str_replace('[pre_action_prompt]', $pre_prompt, $assistant_message);
+ 
+@@ -133,6 +133,10 @@ class AssistantMessageBuilder {
+       $assistant_message = str_replace('[' . $key . ']', is_null($replace) ? '' : $replace, $assistant_message);
+     }
+ 
++    if (!$include_pre_prompt && ($prepared_contexts = $this->getPreparedContexts())) {
++      $assistant_message .= "\n\n" . $prepared_contexts;
++    }
++
+     return $assistant_message;
+   }
+ 
+@@ -195,10 +199,21 @@ class AssistantMessageBuilder {
+       $prepared .= "* action: " . $action['id'] . ", label: " . $action['label'] . ", description: " . $action['description'] . ", plugin: " . $action['plugin'] . "\n";
+     }
+ 
++    $prepared .= $this->getPreparedContexts();
++    return $prepared;
++  }
++
++  /**
++   * Gets deterministic context from enabled assistant plugins.
++   *
++   * @return string
++   *   A string representation of read-only context for AI prompts.
++   */
++  public function getPreparedContexts(): string {
++    $prepared = '';
+     $contexts = $this->actions->listAllContexts($this->assistant, $this->threadId, $this->assistant->get('actions_enabled'));
+     if (count($contexts)) {
+-      $prepared .= "\n";
+-      $prepared .= "The following are contexts for the actions:\n\n";
++      $prepared .= "The following are read-only contexts for the assistant:\n\n";
+       foreach ($contexts as $context) {
+         $prepared .= $context['title'] . "\n";
+         $prepared .= '* ' . implode("\n* ", $context['description']) . "\n\n";
+@@ -246,14 +261,15 @@ class AssistantMessageBuilder {
+   public function getPrePromptDrupalContext() {
+     $context = [];
+     $current_request = $this->requestStack->getCurrentRequest();
++    $route = $current_request?->attributes->get('_route_object');
+     $context['is_logged_in'] = $this->currentUser->isAuthenticated() ? 'is logged in' : 'is not logged in';
+     $context['user_roles'] = implode(', ', $this->currentUser->getRoles());
+     $context['user_id'] = $this->currentUser->id();
+     $context['user_name'] = $this->currentUser->getDisplayName();
+     $context['user_language'] = $this->currentUser->getPreferredLangcode();
+     $context['user_timezone'] = $this->currentUser->getTimeZone();
+-    $context['page_title'] = (string) $this->titleResolver->getTitle($current_request, $current_request->attributes->get('_route_object'));
+-    $context['page_path'] = $this->context['current_route'] ?? $current_request->getRequestUri();
++    $context['page_title'] = ($current_request && $route) ? (string) $this->titleResolver->getTitle($current_request, $route) : '';
++    $context['page_path'] = $this->context['current_route'] ?? ($current_request ? $current_request->getRequestUri() : '');
+     $context['page_language'] = $this->languageManager->getCurrentLanguage()->getId();
+     $context['site_name'] = $this->configFactory->get('system.site')->get('name');
+ 
