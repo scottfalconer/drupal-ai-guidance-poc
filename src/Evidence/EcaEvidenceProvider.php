@@ -46,6 +46,25 @@ final class EcaEvidenceProvider implements GuidanceEvidenceProviderInterface {
    * {@inheritdoc}
    */
   public function collect(GuidanceRequest $request, GuidanceState $state, array $domains): GuidanceEvidence {
+    if (!$this->canInspectEcaConfiguration($request)) {
+      return new GuidanceEvidence(
+        providerId: $this->id(),
+        domain: 'automation',
+        confidence: 'low',
+        drupalEvidence: [
+          'eca_module_enabled' => TRUE,
+          'configuration_details' => 'omitted_for_current_account',
+        ],
+        knownUnknowns: [
+          'ECA is installed, but this account cannot inspect ECA model configuration details.',
+          'A site builder should review automation models before an outside agent changes event, condition, or action behavior.',
+        ],
+        nextDiagnosticSteps: [
+          'Ask a site builder to review ECA models and identify any event, condition, or action that could affect the requested workflow.',
+        ],
+      );
+    }
+
     $config_names = $this->configFactory->listAll('eca.eca.');
     sort($config_names, SORT_STRING);
 
@@ -75,7 +94,7 @@ final class EcaEvidenceProvider implements GuidanceEvidenceProviderInterface {
         'Ask a site builder to review ECA model configuration before changing automation behavior.',
         'For outside-agent work, preserve event, condition, and action ordering unless explicitly asked to change it.',
       ],
-      sources: $config_names,
+      sources: array_map(static fn(array $model): string => 'ECA model: ' . (string) ($model['label'] ?? $model['id'] ?? 'unnamed'), $models),
     );
   }
 
@@ -99,7 +118,6 @@ final class EcaEvidenceProvider implements GuidanceEvidenceProviderInterface {
     $serialized = json_encode($data) ?: '';
 
     return [
-      'config_name' => $config_name,
       'id' => $id,
       'label' => $label,
       'enabled' => !array_key_exists('status', $data) || (bool) $data['status'],
@@ -182,6 +200,22 @@ final class EcaEvidenceProvider implements GuidanceEvidenceProviderInterface {
       }
     }
     return $signals;
+  }
+
+  /**
+   * Checks whether the current account may inspect ECA model configuration.
+   */
+  private function canInspectEcaConfiguration(GuidanceRequest $request): bool {
+    foreach ([
+      'administer ai guidance',
+      'administer site configuration',
+      'administer eca',
+    ] as $permission) {
+      if ($request->account->hasPermission($permission)) {
+        return TRUE;
+      }
+    }
+    return FALSE;
   }
 
 }

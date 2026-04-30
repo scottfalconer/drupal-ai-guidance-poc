@@ -282,6 +282,7 @@ final class SiteConfigurationSourceProviderTest extends UnitTestCase {
     $this->assertCount(1, $sources);
     $this->assertStringContainsString('- `home_listing`: Home listing Paths: `/home`.', $sources[0]->text);
     $this->assertStringContainsString('The configured front page path matches a View/listing in this safe configuration summary.', $sources[0]->text);
+    $this->assertStringContainsString('Promoted-to-front-page relevance: not supported by the matching View evidence; do not recommend it unless a site builder confirms the View uses that flag.', $sources[0]->text);
   }
 
   /**

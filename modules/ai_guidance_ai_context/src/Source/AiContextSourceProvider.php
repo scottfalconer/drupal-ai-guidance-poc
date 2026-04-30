@@ -122,6 +122,7 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
     if (!$repository || !method_exists($repository, 'list')) {
       return;
     }
+    $include_admin_details = $this->canInspectSiteArchitectureDetails($request);
 
     try {
       $contracts = $repository->list(FALSE);
@@ -143,7 +144,7 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
     $selected_contract_ids = [];
     foreach (array_slice($matching_path, 0, 2) as $contract) {
       $selected_contract_ids[] = $this->contractStableId($contract);
-      yield $this->contractSource($this->contractPayload($contract), 'Current page site architecture', 90);
+      yield $this->contractSource($this->contractPayload($contract), 'Current page site architecture', 90, $include_admin_details);
     }
 
     $public_contracts = array_values(array_filter($contracts, static function (array $contract): bool {
@@ -161,7 +162,7 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
       if (in_array($this->contractStableId($contract), $selected_contract_ids, TRUE)) {
         continue;
       }
-      yield $this->contractSource($this->contractPayload($contract), 'Relevant site architecture', 78);
+      yield $this->contractSource($this->contractPayload($contract), 'Relevant site architecture', 78, $include_admin_details);
       $matched_count++;
       if ($matched_count >= 3) {
         break;
@@ -238,10 +239,25 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
    * @param array<string, mixed> $contract
    *   Site behavior contract.
    */
-  private function contractSource(array $contract, string $title_prefix, int $priority): GuidanceSource {
+  private function contractSource(array $contract, string $title_prefix, int $priority, bool $include_admin_details): GuidanceSource {
     $id = (string) ($contract['contract_id'] ?? hash('sha256', json_encode($contract) ?: 'site_architecture'));
     $path = (string) ($contract['path'] ?? $contract['path_pattern'] ?? 'unknown path');
-    $text = $this->contractText($contract);
+    $text = $this->contractText($contract, $include_admin_details);
+    $metadata = [
+      'scope' => 'generated_site_architecture',
+      'source_class' => 'site_architecture',
+      'path' => $path,
+      'contract_type' => $contract['contract_type'] ?? NULL,
+      'schema_version' => $contract['schema_version'] ?? NULL,
+      'confidence' => $contract['confidence']['level'] ?? NULL,
+      'audience' => $contract['audience']['tags'] ?? $contract['audience'] ?? [],
+      'projection_source' => 'ai_context_site_architecture.contract_repository',
+      'preserves_operating_contract_fields' => TRUE,
+      'details' => $include_admin_details ? 'full_for_site_configuration_admin' : 'limited_for_current_account',
+    ];
+    if ($include_admin_details) {
+      $metadata['source_hash'] = $contract['source_hash'] ?? NULL;
+    }
 
     return new GuidanceSource(
       id: 'site_architecture:' . $id,
@@ -250,23 +266,20 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
       type: 'site_architecture_context',
       text: $text,
       priority: $priority,
-      citations: [
-        'contract_id' => $id,
-        'resource_uri' => $contract['resource_uri'] ?? NULL,
+      citations: $include_admin_details
+        ? [
+          'contract_id' => $id,
+          'resource_uri' => $contract['resource_uri'] ?? NULL,
+        ]
+        : [
+          'source' => 'generated site architecture contract',
+        ],
+      metadata: $metadata,
+      accessNotes: [
+        $include_admin_details
+          ? 'Generated from read-only site behavior contracts; includes operating-contract fields when present.'
+          : 'Limited site architecture projection; admin-derived identifiers, provenance, resource URIs, and source hashes are omitted for this account.',
       ],
-      metadata: [
-        'scope' => 'generated_site_architecture',
-        'source_class' => 'site_architecture',
-        'path' => $path,
-        'contract_type' => $contract['contract_type'] ?? NULL,
-        'schema_version' => $contract['schema_version'] ?? NULL,
-        'source_hash' => $contract['source_hash'] ?? NULL,
-        'confidence' => $contract['confidence']['level'] ?? NULL,
-        'audience' => $contract['audience']['tags'] ?? $contract['audience'] ?? [],
-        'projection_source' => 'ai_context_site_architecture.contract_repository',
-        'preserves_operating_contract_fields' => TRUE,
-      ],
-      accessNotes: ['Generated from read-only site behavior contracts; includes operating-contract fields when present.'],
       tokenEstimate: GuidanceSource::estimateTokens($text),
     );
   }
@@ -326,23 +339,27 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
    * @param array<string, mixed> $contract
    *   Site behavior contract.
    */
-  private function contractText(array $contract): string {
+  private function contractText(array $contract, bool $include_admin_details): string {
     $content_source = $contract['content_source'] ?? [];
     $audience = (array) ($contract['audience']['tags'] ?? $contract['audience'] ?? []);
     $resource_uri = (string) ($contract['resource_uri'] ?? '');
     $lines = [
       '# Site architecture contract: ' . ($contract['path'] ?? $contract['path_pattern'] ?? 'unknown path'),
       '',
-      '- Contract ID: `' . ($contract['contract_id'] ?? 'unknown') . '`',
       '- Schema version: `' . ($contract['schema_version'] ?? 'unknown') . '`',
       '- Contract type: `' . ($contract['contract_type'] ?? 'unknown') . '`',
-      $resource_uri !== '' ? '- Resource URI: `' . $resource_uri . '`' : NULL,
       '- Effective responder: `' . $this->scalarOrType($contract['effective_responder'] ?? NULL) . '`',
       '- Semantic surface: `' . $this->scalarOrType($contract['semantic_surface'] ?? NULL) . '`',
       '- Content source: ' . $this->contentSourceText($content_source),
       '- Audience tags: `' . implode('`, `', array_map('strval', $audience)) . '`',
       '- Confidence: `' . $this->scalarOrType($contract['confidence'] ?? NULL) . '`',
     ];
+    if ($include_admin_details) {
+      array_splice($lines, 2, 0, ['- Contract ID: `' . ($contract['contract_id'] ?? 'unknown') . '`']);
+      if ($resource_uri !== '') {
+        $lines[] = '- Resource URI: `' . $resource_uri . '`';
+      }
+    }
     $lines = array_values(array_filter($lines, static fn ($line): bool => $line !== NULL));
 
     if (!empty($contract['page_composition']['component_count'])) {
@@ -351,7 +368,7 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
     if (!empty($contract['actionability_gaps'])) {
       $lines[] = '- Actionability gaps detected: `' . count($contract['actionability_gaps']) . '`';
     }
-    if (!empty($contract['action_owners']) && is_array($contract['action_owners'])) {
+    if ($include_admin_details && !empty($contract['action_owners']) && is_array($contract['action_owners'])) {
       $lines[] = '';
       $lines[] = '## Action owners';
       foreach ($this->summarizeActionOwners($contract['action_owners']) as $summary) {
@@ -365,7 +382,7 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
         $lines[] = '- ' . $negative_contract;
       }
     }
-    if (!empty($contract['validation']['checks']) && is_array($contract['validation']['checks'])) {
+    if ($include_admin_details && !empty($contract['validation']['checks']) && is_array($contract['validation']['checks'])) {
       $lines[] = '';
       $lines[] = '## Validation checks';
       foreach ($this->summarizeValidationChecks($contract['validation']['checks']) as $summary) {
@@ -379,14 +396,14 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
         $lines[] = '- ' . $summary;
       }
     }
-    if (!empty($contract['provenance']) && is_array($contract['provenance'])) {
+    if ($include_admin_details && !empty($contract['provenance']) && is_array($contract['provenance'])) {
       $lines[] = '';
       $lines[] = '## Provenance';
       foreach ($this->compactStrings($contract['provenance'], 5) as $provenance) {
         $lines[] = '- `' . $provenance . '`';
       }
     }
-    if (!empty($contract['source_hash'])) {
+    if ($include_admin_details && !empty($contract['source_hash'])) {
       $lines[] = '';
       $lines[] = '- Source hash: `' . $contract['source_hash'] . '`';
     }
@@ -567,6 +584,21 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
       return (string) ($value['type'] ?? $value['level'] ?? 'array');
     }
     return (string) ($value ?? 'unknown');
+  }
+
+  /**
+   * Checks whether the current account may see full site architecture details.
+   */
+  private function canInspectSiteArchitectureDetails(GuidanceRequest $request): bool {
+    foreach ([
+      'administer ai guidance',
+      'administer site configuration',
+    ] as $permission) {
+      if ($request->account->hasPermission($permission)) {
+        return TRUE;
+      }
+    }
+    return FALSE;
   }
 
 }

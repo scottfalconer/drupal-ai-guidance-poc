@@ -56,7 +56,7 @@ final class WebformEvidenceProviderTest extends UnitTestCase {
     $provider = new WebformEvidenceProvider($config_factory, $module_handler);
     $request = new GuidanceRequest(
       'What happens when I submit this form?',
-      $this->createMock(AccountInterface::class),
+      $this->accountWithPermissions(['administer site configuration']),
     );
 
     $this->assertTrue($provider->applies($request, new GuidanceState([]), ['form_submission']));
@@ -70,6 +70,33 @@ final class WebformEvidenceProviderTest extends UnitTestCase {
     $this->assertSame(['email', 'name'], $form['element_keys']);
     $this->assertSame('email', $form['handler_summaries'][0]['plugin']);
     $this->assertContains('email', $form['handler_risk_signals']);
+    $this->assertContains('Webform: Contact', $evidence['sources']);
+    $this->assertArrayNotHasKey('config_name', $form);
+  }
+
+  /**
+   * Tests accounts without admin access receive limited Webform evidence.
+   */
+  public function testLimitedEvidenceForNonAdminAccount(): void {
+    $config_factory = $this->createMock(ConfigFactoryInterface::class);
+    $config_factory->expects($this->never())->method('listAll');
+
+    $module_handler = $this->createMock(ModuleHandlerInterface::class);
+    $module_handler->method('moduleExists')
+      ->with('webform')
+      ->willReturn(TRUE);
+
+    $provider = new WebformEvidenceProvider($config_factory, $module_handler);
+    $request = new GuidanceRequest(
+      'What should an outside coding agent know before changing this form?',
+      $this->accountWithPermissions([]),
+    );
+
+    $evidence = $provider->collect($request, new GuidanceState([]), ['form_submission'])->toArray();
+
+    $this->assertSame('omitted_for_current_account', $evidence['drupal_evidence']['configuration_details']);
+    $this->assertSame([], $evidence['sources']);
+    $this->assertStringContainsString('cannot inspect Webform', implode(' ', $evidence['known_unknowns']));
   }
 
   /**
@@ -79,6 +106,19 @@ final class WebformEvidenceProviderTest extends UnitTestCase {
     $config = $this->createMock(ImmutableConfig::class);
     $config->method('getRawData')->willReturn($data);
     return $config;
+  }
+
+  /**
+   * Builds an account mock with specified permissions.
+   *
+   * @param string[] $permissions
+   *   Granted permissions.
+   */
+  private function accountWithPermissions(array $permissions): AccountInterface {
+    $account = $this->createMock(AccountInterface::class);
+    $account->method('hasPermission')
+      ->willReturnCallback(static fn(string $permission): bool => in_array($permission, $permissions, TRUE));
+    return $account;
   }
 
 }

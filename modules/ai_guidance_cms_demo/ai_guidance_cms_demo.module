@@ -18,6 +18,8 @@ function ai_guidance_cms_demo_help($route_name, RouteMatchInterface $route_match
       return '<p>'
         . t('This page manages the read-only Drupal AI assistant demo. Use the Refresh demo assistant button, then open chat and try the prompts below.')
         . ' '
+        . t('The first prompt is a Learn Drupal AI-style Lesson 1 that teaches the safe pattern: ask what the current role can do before asking AI for configuration or publishing changes.')
+        . ' '
         . t('In V1, the assistant gives cited guidance and safe manual steps. It cannot create content, change configuration, alter permissions, or execute tools.')
         . '</p>';
   }

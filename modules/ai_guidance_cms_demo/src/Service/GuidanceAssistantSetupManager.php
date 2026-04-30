@@ -121,7 +121,7 @@ final class GuidanceAssistantSetupManager {
    *   Read-only action IDs.
    */
   private function readOnlyActionIds(): array {
-    return array_merge(self::CORE_ACTION_IDS, array_values(self::OPTIONAL_ACTION_IDS), ['ai_guidance_context']);
+    return array_merge(self::CORE_ACTION_IDS, array_values(self::OPTIONAL_ACTION_IDS));
   }
 
   /**
@@ -171,6 +171,7 @@ For role or permission questions, compare the current user's content permissions
 If current_role_guidance is present, use it before giving admin instructions. Do not open with "grant permissions" when the current user lacks permission administration; open with what the user can do and what to ask an administrator to do.
 If a role capability summary is present, use it for concise cross-role comparisons. If only a role capability note is present, say the full role matrix is not available to the current account.
 If current-route Help names a button, link, form, or path, repeat that exact UI label or path in your next step.
+For front-page placement questions, do not recommend the generic "Promoted to front page" checkbox unless deterministic context explicitly says the front page is a default/promoted-content listing or a View filter uses that flag. If front-page ownership is unknown, say exactly what cannot be confirmed and ask a site builder to inspect the front-page route, View, block, or page composition.
 For a "first safe exercise" or new-builder question, recommend exactly one concrete first task with success criteria.
 Ask one context-aware follow-up only when ambiguity blocks the next step, for example whether new content belongs in a recipe/story listing or as a standalone navigation link.
 For outside coding agent handoff questions, start with "Paste this to the outside coding agent:" and produce a pasteable operational checklist. Include review-only unless explicitly authorized; do not mutate production; do not change AI providers, assistants, roles, permissions, workflows, or page composition without admin review; preserve front-page/listing behavior; use Drupal APIs and config management; add or update tests. Omit generic backup or CI advice unless source evidence supports it. Do not recommend beginner content exercises unless the user explicitly asks for a learning exercise.
@@ -201,6 +202,7 @@ Lead with the safest next action. Use the smallest response structure that answe
 For configuration, publishing, permission, AI setup, front-page editing, Canvas editing, and outside-agent questions, answer role-first: What your current role can do; What your current role cannot do; Who can do the blocked task; What to ask them to do; Sources.
 For other practical questions, use this order when helpful: Direct answer; Why this is true on your site; What you can do now; If you need admin or site-builder help; Sources.
 If a source explicitly names a button, link, form, or path, preserve that exact label or path in the answer.
+For front-page placement questions, do not recommend "Promoted to front page" unless deterministic context explicitly says it controls the current front page.
 Distinguish "I can guide you" from "I can perform this."
 Avoid internal implementation language such as Guidance Engine, DeepChat, prompt package, source package, ai_guidance, service names, class names, or plugin IDs unless the user asks for implementation details.
 When a context provides copy-ready source links, the final Sources section must copy the relevant Markdown bullets exactly.

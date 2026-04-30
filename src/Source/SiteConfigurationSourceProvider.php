@@ -38,7 +38,6 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       if (!$full_summary) {
         $node_types = $this->filterNodeTypesForCurrentUser($node_types, $request);
       }
-      $first_exercise = $this->beginnerQuestion($request->question) ? $this->firstSafeExerciseType($node_types) : NULL;
       $site_terms = $this->siteTerms();
       $front_page_path = (string) ($site->get('page.front') ?? '/');
       $front_page_public_path = $this->publicPath($front_page_path);
@@ -89,17 +88,6 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       $lines[] = '';
     }
 
-    if ($first_exercise !== NULL) {
-      $lines[] = '## Beginner first exercise';
-      $lines[] = '- Suggested first safe exercise: create exactly one draft `' . $first_exercise['label'] . '` item at `/node/add/' . $first_exercise['id'] . '`.';
-      $lines[] = '- Success criteria: the item is saved as a draft or unpublished item, appears in `/admin/content`, can be previewed, and does not need to appear on the public front page.';
-      if (!empty($first_exercise['required_fields'])) {
-        $lines[] = '- Required fields to fill first: `' . implode('`, `', $first_exercise['required_fields']) . '`.';
-      }
-      $lines[] = '- Do not list alternative first exercises unless the user asks for options.';
-      $lines[] = '';
-    }
-
     if ($front_page !== []) {
       $lines[] = '## Front page';
       $lines[] = '- Public front page path: `' . $front_page['public_path'] . '`.';
@@ -128,6 +116,9 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       }
       if (!empty($front_page['composition'])) {
         $lines[] = '- Front page composition: ' . $front_page['composition'];
+      }
+      if (!empty($front_page['promoted_flag_relevance'])) {
+        $lines[] = '- Promoted-to-front-page relevance: ' . $front_page['promoted_flag_relevance'];
       }
       if (!empty($front_page['inspection_paths'])) {
         $lines[] = '- Front page inspection paths for administrators/site builders: `' . implode('`, `', $front_page['inspection_paths']) . '`.';
@@ -258,32 +249,6 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
   }
 
   /**
-   * Determines whether the question asks for a beginner exercise.
-   */
-  private function beginnerQuestion(string $question): bool {
-    $question = strtolower($question);
-    if (str_contains($question, 'outside') || str_contains($question, 'agent') || str_contains($question, 'code')) {
-      return FALSE;
-    }
-
-    foreach ([
-      'new to drupal',
-      'new builder',
-      'beginner',
-      'first safe exercise',
-      'first exercise',
-      'what should i learn',
-      'safe exercise',
-    ] as $needle) {
-      if (str_contains($question, $needle)) {
-        return TRUE;
-      }
-    }
-
-    return FALSE;
-  }
-
-  /**
    * Checks whether the current account can receive admin-derived config.
    */
   private function canUseFullConfigurationSummary(GuidanceRequest $request): bool {
@@ -406,6 +371,7 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
         $summary['guidance'][] = 'To add a standalone link or card, open the front page edit path when available, then add or edit the relevant Canvas component by label.';
         $summary['guidance'][] = 'For verification steps, send users to the public front page path `' . $summary['public_path'] . '`, not the configured internal path when those differ.';
         $summary['guidance'][] = 'The generic "Promoted to front page" checkbox does not by itself change this Canvas page composition.';
+        $summary['promoted_flag_relevance'] = 'not relevant by itself; Canvas composition controls this front page.';
         if ($summary['edit_path'] === '') {
           $summary['guidance'][] = 'No front page edit path is exposed for this user in the safe summary; phrase edits as a site-builder request.';
         }
@@ -423,6 +389,7 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
         $summary['edit_path'] = $this->entityEditPath($entity, $request);
         $summary['guidance'][] = 'This site uses a specific node as the front page.';
         $summary['guidance'][] = 'Other newly created content will not automatically appear there unless the node body, an embedded component, or a referenced listing is edited.';
+        $summary['promoted_flag_relevance'] = 'not enough by itself; this front page is a specific node.';
       }
       return $summary;
     }
@@ -432,6 +399,9 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
         $summary['guidance'][] = 'The configured front page path matches a View/listing in this safe configuration summary.';
         $summary['guidance'][] = 'A newly created node appears there only if it satisfies that View display configuration, filters, sorting, and access rules.';
         $summary['guidance'][] = 'Do not assume the generic "Promoted to front page" checkbox is enough unless the View explicitly uses that flag.';
+        $summary['promoted_flag_relevance'] = $this->viewUsesPromotedFlag($view)
+          ? 'possibly relevant because the matching View filters on a promoted/sticky-style flag; verify the exact View filters.'
+          : 'not supported by the matching View evidence; do not recommend it unless a site builder confirms the View uses that flag.';
         return $summary;
       }
     }
@@ -445,6 +415,8 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       ];
       $summary['guidance'][] = 'This safe configuration summary could not resolve the configured front page to a specific node, Canvas page, or matching View.';
       $summary['guidance'][] = 'For this site, do not assume the generic "Promoted to front page" checkbox controls front-page placement.';
+      $summary['guidance'][] = 'Do not give Promoted-to-front-page checkbox steps; this summary lacks evidence that the current front page consumes that flag.';
+      $summary['promoted_flag_relevance'] = 'unknown; do not recommend without explicit View/default-listing evidence.';
       $summary['guidance'][] = 'Say explicitly that the exact front-page item owner cannot be confirmed from the current evidence.';
       $summary['guidance'][] = 'The safe next step is to ask a site builder to inspect the owner of the configured front page path and determine whether it is a Canvas page, View, custom route, menu, or block before recommending a content placement method.';
     }
@@ -812,55 +784,6 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
   }
 
   /**
-   * Picks one concrete content type for a beginner's first exercise.
-   *
-   * @param array<int, array{id: string, label: string, description: string}> $node_types
-   *   Node type summaries.
-   *
-   * @return array{id: string, label: string, description: string}|null
-   *   Suggested type.
-   */
-  private function firstSafeExerciseType(array $node_types): ?array {
-    foreach ($node_types as $type) {
-      $haystack = strtolower(($type['id'] ?? '') . ' ' . ($type['label'] ?? '') . ' ' . ($type['description'] ?? ''));
-      if (str_contains($haystack, 'utility') || str_contains($haystack, 'static')) {
-        continue;
-      }
-      if (($type['id'] ?? '') === 'page') {
-        continue;
-      }
-      $type['required_fields'] = $this->requiredFormFields($type);
-      return $type;
-    }
-
-    if (!empty($node_types[0])) {
-      $node_types[0]['required_fields'] = $this->requiredFormFields($node_types[0]);
-      return $node_types[0];
-    }
-
-    return NULL;
-  }
-
-  /**
-   * Returns required fields visible on the default form.
-   *
-   * @param array<string, mixed> $type
-   *   Node type summary.
-   *
-   * @return string[]
-   *   Required field machine names.
-   */
-  private function requiredFormFields(array $type): array {
-    $fields = [];
-    foreach ((array) ($type['fields'] ?? []) as $field) {
-      if (!empty($field['required']) && !empty($field['on_form'])) {
-        $fields[] = (string) ($field['name'] ?? '');
-      }
-    }
-    return array_values(array_filter($fields));
-  }
-
-  /**
    * Summarizes relevant Views from active configuration.
    *
    * @return array<int, array<string, mixed>>
@@ -987,6 +910,17 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       $summary .= ' ' . strtolower((string) $plugin['order']);
     }
     return $summary;
+  }
+
+  /**
+   * Checks whether a summarized View explicitly references the promoted flag.
+   *
+   * @param array<string, mixed> $view
+   *   View summary.
+   */
+  private function viewUsesPromotedFlag(array $view): bool {
+    $haystack = strtolower(implode(' ', array_map('strval', (array) ($view['filters'] ?? []))));
+    return preg_match('/\b(promote|promoted|sticky)\b/', $haystack) === 1;
   }
 
   /**

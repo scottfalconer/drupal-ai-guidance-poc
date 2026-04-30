@@ -60,7 +60,7 @@ final class EcaEvidenceProviderTest extends UnitTestCase {
     $provider = new EcaEvidenceProvider($config_factory, $module_handler);
     $request = new GuidanceRequest(
       'What automation runs when this content is published?',
-      $this->createMock(AccountInterface::class),
+      $this->accountWithPermissions(['administer site configuration']),
     );
 
     $this->assertTrue($provider->applies($request, new GuidanceState([]), ['automation']));
@@ -73,7 +73,33 @@ final class EcaEvidenceProviderTest extends UnitTestCase {
     $this->assertSame('publish_notice', $model['id']);
     $this->assertContains('node:title', $model['token_names']);
     $this->assertContains('email', $model['mutating_or_outbound_signals']);
-    $this->assertContains('eca.eca.publish_notice', $evidence['sources']);
+    $this->assertContains('ECA model: Publish notice', $evidence['sources']);
+    $this->assertArrayNotHasKey('config_name', $model);
+  }
+
+  /**
+   * Tests accounts without admin access receive limited ECA evidence.
+   */
+  public function testLimitedEvidenceForNonAdminAccount(): void {
+    $config_factory = $this->createMock(ConfigFactoryInterface::class);
+    $config_factory->expects($this->never())->method('listAll');
+
+    $module_handler = $this->createMock(ModuleHandlerInterface::class);
+    $module_handler->method('moduleExists')
+      ->with('eca')
+      ->willReturn(TRUE);
+
+    $provider = new EcaEvidenceProvider($config_factory, $module_handler);
+    $request = new GuidanceRequest(
+      'What should an outside coding agent know before changing automation?',
+      $this->accountWithPermissions([]),
+    );
+
+    $evidence = $provider->collect($request, new GuidanceState([]), ['automation'])->toArray();
+
+    $this->assertSame('omitted_for_current_account', $evidence['drupal_evidence']['configuration_details']);
+    $this->assertSame([], $evidence['sources']);
+    $this->assertStringContainsString('cannot inspect ECA model configuration', implode(' ', $evidence['known_unknowns']));
   }
 
   /**
@@ -83,6 +109,19 @@ final class EcaEvidenceProviderTest extends UnitTestCase {
     $config = $this->createMock(ImmutableConfig::class);
     $config->method('getRawData')->willReturn($data);
     return $config;
+  }
+
+  /**
+   * Builds an account mock with specified permissions.
+   *
+   * @param string[] $permissions
+   *   Granted permissions.
+   */
+  private function accountWithPermissions(array $permissions): AccountInterface {
+    $account = $this->createMock(AccountInterface::class);
+    $account->method('hasPermission')
+      ->willReturnCallback(static fn(string $permission): bool => in_array($permission, $permissions, TRUE));
+    return $account;
   }
 
 }

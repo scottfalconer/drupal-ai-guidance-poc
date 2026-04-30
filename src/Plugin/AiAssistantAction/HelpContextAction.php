@@ -113,24 +113,18 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
 
     $counts = [
       'route_help' => 0,
-      'hook_help' => 0,
       'help_topic' => 0,
     ];
     $limits = [
       'route_help' => 1,
-      'hook_help' => 1,
       'help_topic' => 1,
     ];
     $lower_question = strtolower($question);
     if ($this->isCurrentPageQuestion($lower_question)) {
-      $limits['hook_help'] = 0;
       $limits['help_topic'] = 0;
     }
-    elseif ($this->isEditorAiQuestion($lower_question)) {
-      $limits['hook_help'] = 0;
-    }
-    elseif ($this->isFrontPageQuestion($lower_question)) {
-      $limits['hook_help'] = 0;
+    elseif ($this->isLessonQuestion($lower_question)) {
+      $limits['help_topic'] = 2;
     }
 
     $selected = [];
@@ -158,7 +152,7 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
     $haystack = strtolower($source->title . ' ' . $source->text . ' ' . json_encode($source->metadata));
     $score = 0;
 
-    if ($this->isCurrentPageQuestion($question) && in_array($source->type, ['route_help', 'hook_help'], TRUE)) {
+    if ($this->isCurrentPageQuestion($question) && $source->type === 'route_help') {
       $score += 100;
     }
 
@@ -166,13 +160,18 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
       $score += 100;
     }
 
+    if ($this->isLessonQuestion($question)) {
+      if (str_contains($haystack, 'lesson 1')) {
+        $score += 120;
+      }
+      if (str_contains($haystack, 'learn drupal ai')) {
+        $score += 40;
+      }
+    }
+
     if ($this->isFrontPageQuestion($question) && !str_contains($haystack, 'front page') && !str_contains($haystack, 'homepage')) {
       return 0;
     }
-    if ($this->isFrontPageQuestion($question) && $source->type === 'hook_help') {
-      return 0;
-    }
-
     foreach ($this->questionTerms($question) as $term) {
       if (str_contains(strtolower($source->title), $term)) {
         $score += 15;
@@ -239,6 +238,15 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
    */
   private function isEditorAiQuestion(string $question): bool {
     return str_contains($question, 'content editor') && str_contains($question, 'ai');
+  }
+
+  /**
+   * Checks if the question asks for a Learn Drupal AI-style lesson.
+   */
+  private function isLessonQuestion(string $question): bool {
+    return str_contains($question, 'lesson')
+      || str_contains($question, 'learn drupal ai')
+      || str_contains($question, 'learning path');
   }
 
   /**

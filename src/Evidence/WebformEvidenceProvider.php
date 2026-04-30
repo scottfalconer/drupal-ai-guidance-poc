@@ -47,6 +47,25 @@ final class WebformEvidenceProvider implements GuidanceEvidenceProviderInterface
    * {@inheritdoc}
    */
   public function collect(GuidanceRequest $request, GuidanceState $state, array $domains): GuidanceEvidence {
+    if (!$this->canInspectWebformConfiguration($request)) {
+      return new GuidanceEvidence(
+        providerId: $this->id(),
+        domain: 'form_submission',
+        confidence: 'low',
+        drupalEvidence: [
+          'webform_module_enabled' => TRUE,
+          'configuration_details' => 'omitted_for_current_account',
+        ],
+        knownUnknowns: [
+          'Webform is installed, but this account cannot inspect Webform element, handler, or submission-access configuration details.',
+          'A site builder should review form handlers before an outside agent changes submission, email, webhook, or storage behavior.',
+        ],
+        nextDiagnosticSteps: [
+          'Ask a site builder to review the relevant Webform elements, handlers, and submission access settings.',
+        ],
+      );
+    }
+
     $config_names = $this->configFactory->listAll('webform.webform.');
     sort($config_names, SORT_STRING);
 
@@ -75,7 +94,7 @@ final class WebformEvidenceProvider implements GuidanceEvidenceProviderInterface
         'Ask a site builder to review Webform elements, handlers, and submission access before changing submission behavior.',
         'For outside-agent work, preserve handlers that send email, post remotely, or affect submission storage unless explicitly authorized.',
       ],
-      sources: $config_names,
+      sources: array_map(static fn(array $form): string => 'Webform: ' . (string) ($form['title'] ?? $form['id'] ?? 'untitled'), $forms),
     );
   }
 
@@ -95,7 +114,6 @@ final class WebformEvidenceProvider implements GuidanceEvidenceProviderInterface
     $handlers = (array) ($data['handlers'] ?? []);
 
     return [
-      'config_name' => $config_name,
       'id' => $id,
       'title' => (string) ($data['title'] ?? $id),
       'status' => (string) ($data['status'] ?? ''),
@@ -184,6 +202,22 @@ final class WebformEvidenceProvider implements GuidanceEvidenceProviderInterface
       }
     }
     return $signals;
+  }
+
+  /**
+   * Checks whether the current account may inspect Webform configuration.
+   */
+  private function canInspectWebformConfiguration(GuidanceRequest $request): bool {
+    foreach ([
+      'administer ai guidance',
+      'administer site configuration',
+      'administer webform',
+    ] as $permission) {
+      if ($request->account->hasPermission($permission)) {
+        return TRUE;
+      }
+    }
+    return FALSE;
   }
 
 }

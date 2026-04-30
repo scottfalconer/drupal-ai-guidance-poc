@@ -60,12 +60,16 @@ final class SiteConfigSummaryContextAction extends GuidanceReadOnlyActionBase {
    */
   public function listContexts(): array {
     if ($this->authoritativeContractsEnabled()) {
+      $lines = [
+        'Generated site architecture contracts are available through the site architecture bridge and should be treated as the authoritative site behavior evidence.',
+        'The fallback configuration inventory is intentionally suppressed so it does not compete with or duplicate generated behavior contracts.',
+        'If a contract does not answer the question, say what cannot be confirmed and ask a site builder to inspect the relevant route, View, block, or Canvas page.',
+      ];
+      if ($this->frontPageQuestion()) {
+        $lines[] = 'For front-page placement, do not recommend the generic "Promoted to front page" checkbox unless the generated contract explicitly says the current front page consumes that flag.';
+      }
       return [
-        $this->contextItem('Fallback site configuration summary', [
-          'Generated site architecture contracts are available through the site architecture bridge and should be treated as the authoritative site behavior evidence.',
-          'The fallback configuration inventory is intentionally suppressed so it does not compete with or duplicate generated behavior contracts.',
-          'If a contract does not answer the question, say what cannot be confirmed and ask a site builder to inspect the relevant route, View, block, or Canvas page.',
-        ]),
+        $this->contextItem('Fallback site configuration summary', $lines),
       ];
     }
 
@@ -102,6 +106,25 @@ final class SiteConfigSummaryContextAction extends GuidanceReadOnlyActionBase {
     }
 
     return is_array($contracts) && $contracts !== [];
+  }
+
+  /**
+   * Checks whether the current question asks about front-page placement.
+   */
+  private function frontPageQuestion(): bool {
+    $question = mb_strtolower($this->currentQuestion());
+    foreach ([
+      'front page',
+      'homepage',
+      'home page',
+      'shown on the front',
+      'items shown',
+    ] as $needle) {
+      if (str_contains($question, $needle)) {
+        return TRUE;
+      }
+    }
+    return FALSE;
   }
 
 }

@@ -16,9 +16,14 @@ use Drupal\user\PermissionHandlerInterface;
 final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
 
   /**
-   * Permission names relevant to AI guidance.
+   * Baseline permissions always worth checking before registry filtering.
+   *
+   * The registry still drives the broader relevant-permission catalog below:
+   * restricted permissions and permissions whose title/provider/description
+   * match the current guidance domains are included without maintaining a
+   * complete hard-coded allowlist here.
    */
-  private const RELEVANT_PERMISSIONS = [
+  private const BASELINE_CAPABILITY_PERMISSIONS = [
     'administer ai',
     'administer ai providers',
     'administer ai_assistant',
@@ -90,7 +95,7 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
    */
   private function relevantPermissionCatalog(): array {
     $catalog = [];
-    foreach (self::RELEVANT_PERMISSIONS as $permission) {
+    foreach (self::BASELINE_CAPABILITY_PERMISSIONS as $permission) {
       $catalog[$permission] = [
         'title' => $permission,
         'restrict_access' => $this->isKnownRestrictedPermission($permission),
@@ -134,7 +139,7 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
    *   Permission definition.
    */
   private function permissionLooksRelevant(string $permission, array $definition): bool {
-    if (in_array($permission, self::RELEVANT_PERMISSIONS, TRUE)) {
+    if (in_array($permission, self::BASELINE_CAPABILITY_PERMISSIONS, TRUE)) {
       return TRUE;
     }
     if (!empty($definition['restrict access'])) {

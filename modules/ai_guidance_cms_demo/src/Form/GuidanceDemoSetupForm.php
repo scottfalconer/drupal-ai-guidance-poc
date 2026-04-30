@@ -51,7 +51,7 @@ final class GuidanceDemoSetupForm extends FormBase {
       '#markup' => '<p><strong>' . $this->t('Demo claim:') . '</strong> '
         . $this->t('Drupal chat can answer from this site\'s route, content model, Help, permissions, and guidance sources through read-only AI Assistant context actions.')
         . '</p><p>'
-        . $this->t('Start here, refresh the assistant, then open chat and ask: "What can I do on this page?"')
+        . $this->t('Start here, refresh the assistant, then open chat and ask: "Show me Lesson 1 for using Drupal AI safely on this site."')
         . '</p>',
     ];
 
@@ -74,6 +74,7 @@ final class GuidanceDemoSetupForm extends FormBase {
       '#theme' => 'item_list',
       '#items' => [
         $this->t('What can I do on this page?'),
+        $this->t('Show me Lesson 1 for using Drupal AI safely on this site.'),
         $this->t('How do I configure Drupal AI safely for content editors?'),
         $this->t('Why can content editors draft content, but not configure AI providers or permissions?'),
         $this->t('Compare what anonymous, content editor, and administrator can do on this page.'),
@@ -134,7 +135,12 @@ final class GuidanceDemoSetupForm extends FormBase {
       [
         'label' => $this->t('Default chat provider'),
         'status' => $status['provider_configured'] ? $this->t('Ready') : $this->t('Needs setup'),
-        'value' => $this->t('A provider/model is needed before the chat can answer.'),
+        'value' => $this->t('A provider/model is needed before the chat can answer. For recording, use the strongest available chat model; the latest stress run used gpt-5.4.'),
+      ],
+      [
+        'label' => $this->t('Lesson 1'),
+        'status' => $status['help_available'] ? $this->t('Ready') : $this->t('Unavailable'),
+        'value' => $this->t('A Help Topic turns the Learn Drupal AI pattern into a first safe exercise inside the demo.'),
       ],
       [
         'label' => $this->t('Local Help sources'),

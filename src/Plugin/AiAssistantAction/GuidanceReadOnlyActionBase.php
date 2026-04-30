@@ -103,6 +103,7 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
       'For role or permission questions, compare the current user content_type_permissions with AI and admin capability flags; explain what the role can do, what it cannot do, and who should handle the blocked task.',
       'If a role_capability_summary is present, use it for concise cross-role comparisons. If only role_capability_note is present, say the full role matrix is not available to the current account.',
       'If current-route Help names a button, link, form, or path, repeat that exact label or path.',
+      'For front-page placement questions, do not recommend the generic "Promoted to front page" checkbox unless deterministic context explicitly says the front page is a default/promoted-content listing or a View filter uses that flag. If front-page ownership is unknown, say so and ask a site builder to inspect the front-page route, View, block, or page composition.',
       'For outside coding agent handoff questions, start with "Paste this to the outside coding agent:" and produce a pasteable operational checklist. Include review-only unless explicitly authorized; do not mutate production; do not change AI providers, assistants, roles, permissions, workflows, or page composition without admin review; preserve front-page/listing behavior; use Drupal APIs and config management; add or update tests. Omit generic backup or CI advice unless source evidence supports it. Do not recommend beginner content exercises unless the user explicitly asks for a learning exercise.',
       'For current-page help, describe actions supported by this page or its route Help. Do not suggest generic administration exploration unless a source names that setting or the user asks for implementation details.',
       'Avoid internal implementation terms such as Guidance Engine, DeepChat, prompt package, source package, module machine names, service names, class names, and plugin IDs unless the user asks how this assistant is implemented.',
@@ -254,8 +255,7 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
     }
 
     $lines = [
-      'Source evidence follows. Use display citation IDs such as [S1], [H1], [BP1], or [C1]; do not expose internal source IDs.',
-      'Final Sources bullets must start with their display citation ID and should copy the relevant bullet shown here.',
+      'Source evidence follows. Use the display citation IDs shown in the source bullets; do not expose internal source IDs.',
     ];
     $sources = array_slice(array_values($sources), 0, $limit);
     $source_bullets = [];
@@ -293,6 +293,14 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
     $metadata = $this->redactor->redactArray($source->metadata)['value'];
     $access_notes = $this->redactor->redactArray($source->accessNotes)['value'];
 
+    if (!$this->canInspectInternalSourceIdentifiers()) {
+      $title = is_string($title) ? $this->stripInternalConfigIdentifiers($title) : $title;
+      $text = is_string($text) ? $this->stripInternalConfigIdentifiers($text) : $text;
+      $citations = is_array($citations) ? $this->stripInternalConfigIdentifiersFromArray($citations) : $citations;
+      $metadata = is_array($metadata) ? $this->stripInternalConfigIdentifiersFromArray($metadata) : $metadata;
+      $access_notes = is_array($access_notes) ? $this->stripInternalConfigIdentifiersFromArray($access_notes) : $access_notes;
+    }
+
     return new GuidanceSource(
       id: $source->id,
       canonicalId: $source->canonicalId,
@@ -307,6 +315,53 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
       tokenEstimate: GuidanceSource::estimateTokens(is_string($text) ? $text : ''),
       citationId: $source->citationId,
     );
+  }
+
+  /**
+   * Checks whether model-visible context may include raw config identifiers.
+   */
+  private function canInspectInternalSourceIdentifiers(): bool {
+    foreach ([
+      'administer ai guidance',
+      'administer site configuration',
+    ] as $permission) {
+      if ($this->currentUser->hasPermission($permission)) {
+        return TRUE;
+      }
+    }
+    return FALSE;
+  }
+
+  /**
+   * Replaces admin-derived config object IDs in model-visible text.
+   */
+  private function stripInternalConfigIdentifiers(string $text): string {
+    $patterns = [
+      '/\b(?:block\.block|canvas\.component|core\.entity_[a-z0-9_]+|eca\.eca|field\.field|field\.storage|node\.type|views\.view|webform\.webform|workflows\.workflow)\.[a-z0-9_.:-]+/i',
+      '/drupal:\/\/site\/contracts\/[^\s`)]+/i',
+    ];
+    return preg_replace($patterns, '[admin-only config identifier]', $text) ?? $text;
+  }
+
+  /**
+   * Replaces admin-derived config object IDs in nested arrays.
+   *
+   * @param array<string|int, mixed> $data
+   *   Data to sanitize.
+   *
+   * @return array<string|int, mixed>
+   *   Sanitized data.
+   */
+  private function stripInternalConfigIdentifiersFromArray(array $data): array {
+    foreach ($data as $key => $value) {
+      if (is_string($value)) {
+        $data[$key] = $this->stripInternalConfigIdentifiers($value);
+      }
+      elseif (is_array($value)) {
+        $data[$key] = $this->stripInternalConfigIdentifiersFromArray($value);
+      }
+    }
+    return $data;
   }
 
   /**

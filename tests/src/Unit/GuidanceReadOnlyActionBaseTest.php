@@ -59,7 +59,7 @@ final class GuidanceReadOnlyActionBaseTest extends UnitTestCase {
     ]);
 
     $this->assertContains('- [H1] [Safe AI configuration for content editors](/admin/help/topic/ai_guidance.safe_editor_ai)', $lines);
-    $this->assertContains('Final Sources bullets must start with their display citation ID and should copy the relevant bullet shown here.', $lines);
+    $this->assertContains('Source evidence follows. Use the display citation IDs shown in the source bullets; do not expose internal source IDs.', $lines);
   }
 
   /**
@@ -127,6 +127,55 @@ final class GuidanceReadOnlyActionBaseTest extends UnitTestCase {
     $this->assertStringNotContainsString('token=secret', $context);
     $this->assertStringNotContainsString('api_key=secret', $context);
     $this->assertStringNotContainsString('sk-abcdefghijklmnop', $context);
+  }
+
+  /**
+   * Tests non-admin source formatting hides raw config identifiers.
+   */
+  public function testSourceLinesRedactAdminConfigIdentifiersForNonAdmin(): void {
+    $current_user = $this->createMock(AccountProxyInterface::class);
+    $current_user->method('hasPermission')->willReturn(FALSE);
+
+    $action = new class(
+      [],
+      $this->createMock(PrivateTempStoreFactory::class),
+      $current_user,
+      new RequestStack(),
+      new GuidanceRedactor(),
+    ) extends GuidanceReadOnlyActionBase {
+
+      /**
+       * {@inheritdoc}
+       */
+      public function listContexts(): array {
+        return [];
+      }
+
+      /**
+       * Exposes source line formatting for tests.
+       */
+      public function exposeSourceLines(array $sources, string $prefix = 'C'): array {
+        return $this->sourceLines($sources, $prefix, 1);
+      }
+
+    };
+
+    $lines = $action->exposeSourceLines([
+      new GuidanceSource(
+        id: 'site_architecture:surface_index',
+        canonicalId: 'site_architecture.surface_index',
+        title: 'Generated site architecture surface index',
+        type: 'site_architecture_context',
+        text: 'Provenance: `eca.eca.auth_redirects`, `webform.webform.contact`, `views.view.frontpage`, drupal://site/contracts/eca.eca.auth_redirects.',
+      ),
+    ]);
+
+    $context = implode("\n", $lines);
+    $this->assertStringContainsString('[admin-only config identifier]', $context);
+    $this->assertStringNotContainsString('eca.eca.auth_redirects', $context);
+    $this->assertStringNotContainsString('webform.webform.contact', $context);
+    $this->assertStringNotContainsString('views.view.frontpage', $context);
+    $this->assertStringNotContainsString('drupal://site/contracts/eca.eca.auth_redirects', $context);
   }
 
 }

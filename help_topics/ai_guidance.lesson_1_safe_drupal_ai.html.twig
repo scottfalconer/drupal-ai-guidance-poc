@@ -1,0 +1,23 @@
+---
+label: 'Lesson 1: Use Drupal AI safely on this site'
+top_level: false
+---
+<h2>{% trans %}Goal{% endtrans %}</h2>
+<p>{% trans %}Learn the first safe pattern for using AI inside Drupal: ask what the current role can do before asking for configuration, publishing, permission, or site-building changes.{% endtrans %}</p>
+
+<h2>{% trans %}Why this matters{% endtrans %}</h2>
+<p>{% trans %}Drupal behavior depends on live site state: routes, roles, permissions, content types, workflows, Views, forms, blocks, Help, and module configuration. A useful AI answer should explain what is true on this site, what the current user can do, what requires an administrator or site builder, and which source supports the answer.{% endtrans %}</p>
+
+<h2>{% trans %}Exercise{% endtrans %}</h2>
+<p>{% trans %}Open a page where you can work, such as a content add form or the content administration page, and ask: <em>What can I do on this page?</em> Then ask: <em>Why can I draft content, but not configure AI providers or permissions?</em>{% endtrans %}</p>
+
+<h2>{% trans %}Success criteria{% endtrans %}</h2>
+<ul>
+  <li>{% trans %}The answer separates current-user actions from administrator or site-builder actions.{% endtrans %}</li>
+  <li>{% trans %}The answer names the relevant role, permission, workflow, route, or content evidence when available.{% endtrans %}</li>
+  <li>{% trans %}The answer does not tell an editor to change providers, assistant configuration, permissions, workflows, or page composition directly unless the current user has that access.{% endtrans %}</li>
+  <li>{% trans %}The answer gives one safe next step and one way to verify it worked.{% endtrans %}</li>
+</ul>
+
+<h2>{% trans %}Safe boundary{% endtrans %}</h2>
+<p>{% trans %}In this V1 demo, the assistant is read-only. It can explain and guide, but it cannot create content, publish content, change configuration, alter permissions, execute tools, or act as an autonomous agent.{% endtrans %}</p>

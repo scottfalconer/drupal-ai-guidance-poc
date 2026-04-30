@@ -63,9 +63,10 @@ AI Guidance:
 ## Current Evaluation Signal
 
 The local same-model evaluation matrix compares stock answers, configured-stock
-baselines, and AI Guidance variants with the same model and persona. The latest
-local run used `gpt-4.1-mini`, a `content_editor` persona, and 104 total
-answers across the available test sites and variants.
+baselines, and AI Guidance variants with the same model and persona. A complete
+earlier run used `gpt-4.1-mini`, a `content_editor` persona, and 104 total
+answers across the available test sites and variants. A later partial Umami run
+used `gpt-5.4-2026-03-05` to raise the stock baseline with a stronger model.
 
 The strongest current signals are:
 
@@ -82,6 +83,10 @@ The strongest current signals are:
   compared with 1 to 3 of 8 for the stock and configured-stock baselines.
 - The evaluation is same-model, so the observed difference is primarily the
   evidence package and response rules, not model choice.
+- The `gpt-5.4` spot check narrowed the prose-quality gap but did not remove
+  the evidence gap. Stock answers became more cautious and better structured;
+  Guidance still supplied display citations, current-role permission evidence,
+  current-page Help, and the Lesson 1 Help Topic source.
 
 The evaluation also exposes work that still matters before overclaiming:
 
@@ -104,6 +109,10 @@ the site a user is actually working on.
 
 The relationship is direct:
 
+- **Lesson 1 is demoable.** The demo includes a Help Topic named "Lesson 1:
+  Use Drupal AI safely on this site." It teaches the first habit: ask what the
+  current role can do before asking AI for configuration, publishing, or
+  permission changes.
 - **Hands-on first.** Learning content can teach the concept; AI Guidance can
   turn it into a safe next step on the current site, such as creating exactly
   one draft with success criteria and a verification step.

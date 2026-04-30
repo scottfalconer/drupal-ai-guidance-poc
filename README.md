@@ -50,7 +50,9 @@ surface behavior.
 
 ## Demo setup
 
-1. Configure a default chat provider/model in AI settings.
+1. Configure a default chat provider/model in AI settings. For recording or
+   evaluation, use the strongest current chat model available; the latest local
+   stress run used `gpt-5.4` to make the stock baseline more competitive.
 2. Enable `ai_guidance` and `ai_guidance_cms_demo`.
 3. Optionally enable `ai_guidance_best_practices` and
    `ai_guidance_ai_context`.
@@ -61,6 +63,17 @@ surface behavior.
 
 The demo assistant injects guidance through the AI Assistant action context API
 before the first model call. It does not expose executable actions.
+
+The first demo prompt is intentionally framed as a Learn Drupal AI-style lesson:
+`Show me Lesson 1 for using Drupal AI safely on this site.` The answer should
+ground the lesson in the current page, role, permissions, and Help Topic source
+instead of giving generic AI training advice.
+
+Stronger models improve generic stock answers, but they do not remove the need
+for Drupal evidence. In the latest `gpt-5.4` spot check, stock answers became
+better shaped and more cautious, while AI Guidance still supplied the
+site-specific permissions, route Help, Lesson 1 source, and citations that stock
+answers could not infer.
 
 ## Evidence Providers
 

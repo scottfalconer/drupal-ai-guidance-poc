@@ -24,6 +24,10 @@ services:
       $classifier: '@ai_guidance.domain_classifier'
       $providers: !tagged_iterator guidance_evidence_provider
 
+  Drupal\ai_guidance\Evidence\AccessEvidenceProvider:
+    tags:
+      - { name: guidance_evidence_provider, priority: 50 }
+
   Drupal\ai_guidance\Evidence\EcaEvidenceProvider:
     arguments:
       $configFactory: '@config.factory'

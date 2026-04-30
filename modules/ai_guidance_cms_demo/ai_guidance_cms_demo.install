@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Removes the legacy combined context action from demo assistant config.
+ */
+function ai_guidance_cms_demo_update_10001(): string {
+  $entity_type_manager = \Drupal::entityTypeManager();
+  if (!$entity_type_manager->hasDefinition('ai_assistant')) {
+    return 'AI Assistant entity type is not available.';
+  }
+
+  $assistant = $entity_type_manager
+    ->getStorage('ai_assistant')
+    ->load('drupal_guidance_assistant');
+  if (!$assistant) {
+    return 'Drupal Guidance Assistant was not found.';
+  }
+
+  $actions = $assistant->get('actions_enabled') ?: [];
+  unset($actions['ai_guidance_context']);
+  foreach ([
+    'ai_guidance_site_state_context',
+    'ai_guidance_site_config_context',
+    'ai_guidance_help_context',
+  ] as $action_id) {
+    $actions[$action_id] ??= [];
+  }
+  if (\Drupal::moduleHandler()->moduleExists('ai_guidance_best_practices')) {
+    $actions['ai_guidance_best_practices_context'] ??= [];
+  }
+  if (\Drupal::moduleHandler()->moduleExists('ai_guidance_ai_context')) {
+    $actions['ai_guidance_ai_context_bridge'] ??= [];
+  }
+
+  $assistant->set('actions_enabled', $actions);
+  $assistant->save();
+
+  return 'Removed legacy Drupal Guidance context action from the demo assistant.';
+}
