@@ -84,15 +84,7 @@ final class GuidanceContextAction extends AiAssistantActionBase {
    * {@inheritdoc}
    */
   public function listContexts(): array {
-    return [
-      [
-        'title' => 'Read-only guidance setup notice',
-        'description' => [
-          'This older combined context adapter has been replaced by granular read-only AI Assistant context actions.',
-          'Use the Refresh demo assistant button to enable site state, Help, site configuration, optional site policy, and optional Best Practices contexts directly.',
-        ],
-      ],
-    ];
+    return [];
   }
 
   /**

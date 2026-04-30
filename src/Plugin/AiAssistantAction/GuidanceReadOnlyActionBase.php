@@ -23,6 +23,21 @@ use Symfony\Component\HttpFoundation\RequestStack;
 abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
 
   /**
+   * Decoded request body for the current plugin invocation.
+   */
+  private ?array $requestData = NULL;
+
+  /**
+   * Latest user question for the current plugin invocation.
+   */
+  private ?string $currentQuestion = NULL;
+
+  /**
+   * Caller context for the current plugin invocation.
+   */
+  private ?array $requestContext = NULL;
+
+  /**
    * Constructs a read-only guidance action.
    */
   public function __construct(
@@ -127,18 +142,22 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
    * Gets the latest user question from assistant history or request data.
    */
   protected function currentQuestion(): string {
+    if ($this->currentQuestion !== NULL) {
+      return $this->currentQuestion;
+    }
+
     $request = $this->requestStack->getCurrentRequest();
     if ($request) {
       $query_question = trim((string) $request->query->get('question', ''));
       if ($query_question !== '') {
-        return mb_substr($query_question, 0, 2000);
+        return $this->currentQuestion = mb_substr($query_question, 0, 2000);
       }
 
-      $data = json_decode($request->getContent(), TRUE);
+      $data = $this->requestData();
       if (is_array($data)) {
         foreach (array_reverse((array) ($data['messages'] ?? [])) as $message) {
           if (($message['role'] ?? NULL) === 'user') {
-            return mb_substr((string) ($message['text'] ?? $message['content'] ?? $message['message'] ?? ''), 0, 2000);
+            return $this->currentQuestion = mb_substr((string) ($message['text'] ?? $message['content'] ?? $message['message'] ?? ''), 0, 2000);
           }
         }
       }
@@ -150,36 +169,57 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
         $messages = $session['messages'] ?? [];
         for ($i = count($messages) - 1; $i >= 0; $i--) {
           if (($messages[$i]['role'] ?? NULL) === 'user') {
-            return (string) ($messages[$i]['message'] ?? '');
+            return $this->currentQuestion = (string) ($messages[$i]['message'] ?? '');
           }
         }
       }
       catch (\Throwable) {
-        return '';
+        return $this->currentQuestion = '';
       }
     }
 
-    return '';
+    return $this->currentQuestion = '';
   }
 
   /**
    * Reads caller context from DeepChat/AI Assistant request data.
    */
   protected function requestContext(): array {
+    if ($this->requestContext !== NULL) {
+      return $this->requestContext;
+    }
+
     $request = $this->requestStack->getCurrentRequest();
     if (!$request) {
-      return [];
+      return $this->requestContext = [];
     }
 
     $context = [];
-    $data = json_decode($request->getContent(), TRUE);
+    $data = $this->requestData();
     if (is_array($data['contexts'] ?? NULL)) {
       $context = $data['contexts'];
     }
     if ($request->query->has('current_route')) {
       $context['current_route'] = $request->query->get('current_route');
     }
-    return $context;
+    return $this->requestContext = $context;
+  }
+
+  /**
+   * Gets decoded JSON request data once per action invocation.
+   */
+  private function requestData(): array {
+    if ($this->requestData !== NULL) {
+      return $this->requestData;
+    }
+
+    $request = $this->requestStack->getCurrentRequest();
+    if (!$request) {
+      return $this->requestData = [];
+    }
+
+    $data = json_decode($request->getContent(), TRUE);
+    return $this->requestData = is_array($data) ? $data : [];
   }
 
   /**
