@@ -11,6 +11,7 @@ use Drupal\ai_assistant_api\Attribute\AiAssistantAction;
 use Drupal\ai_guidance\Prompt\GuidanceRedactor;
 use Drupal\ai_guidance\Source\HelpTopicsSourceProvider;
 use Drupal\ai_guidance\Source\HookHelpSourceProvider;
+use Drupal\ai_guidance\Source\LessonSourceProvider;
 use Drupal\ai_guidance\State\GuidanceStateAggregator;
 use Drupal\ai_guidance\Value\GuidanceSource;
 use Psr\Log\LoggerInterface;
@@ -37,6 +38,7 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
     GuidanceRedactor $redactor,
     private readonly GuidanceStateAggregator $stateAggregator,
     private readonly HookHelpSourceProvider $hookHelpSourceProvider,
+    private readonly LessonSourceProvider $lessonSourceProvider,
     private readonly HelpTopicsSourceProvider $helpTopicsSourceProvider,
     ?LoggerInterface $logger = NULL,
   ) {
@@ -55,6 +57,7 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
       $container->get('ai_guidance.redactor'),
       $container->get('ai_guidance.state_aggregator'),
       $container->get(HookHelpSourceProvider::class),
+      $container->get(LessonSourceProvider::class),
       $container->get(HelpTopicsSourceProvider::class),
       $container->get('logger.channel.ai_guidance'),
     );
@@ -70,14 +73,17 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
     foreach ($this->hookHelpSourceProvider->getSources($request, $state) as $source) {
       $sources[] = $source;
     }
+    foreach ($this->lessonSourceProvider->getSources($request, $state) as $source) {
+      $sources[] = $source;
+    }
     foreach ($this->helpTopicsSourceProvider->getSources($request, $state) as $source) {
       $sources[] = $source;
     }
     $sources = $this->selectSources($sources, $request->question);
 
     return [
-      $this->contextItem('Current page Help and Help Topics', array_merge([
-        'Use current-route hook_help() before generic Help Topics for page-specific questions.',
+      $this->contextItem('Current page Help, Help Topics, and packaged lessons', array_merge([
+        'Use current-route hook_help() before generic Help Topics for page-specific questions. Use packaged lesson Markdown for Learn Drupal AI lesson questions.',
         'If current-route hook_help() names a button, link, form, or path, preserve that exact UI label in the answer.',
         $this->isFrontPageQuestion(strtolower($request->question))
           ? 'For front-page placement questions, generic Node help about "Promoted to front page" is not site-specific evidence; prefer the site configuration summary or site architecture contracts.'
@@ -116,10 +122,12 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
 
     $counts = [
       'route_help' => 0,
+      'lesson_package' => 0,
       'help_topic' => 0,
     ];
     $limits = [
       'route_help' => 1,
+      'lesson_package' => 1,
       'help_topic' => 1,
     ];
     $lower_question = strtolower($question);
@@ -127,6 +135,7 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
       $limits['help_topic'] = 0;
     }
     elseif ($this->isLessonQuestion($lower_question)) {
+      $limits['lesson_package'] = 1;
       $limits['help_topic'] = 2;
     }
 
@@ -164,7 +173,13 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
     }
 
     if ($this->isLessonQuestion($question)) {
+      if ($source->type === 'lesson_package') {
+        $score += 180;
+      }
       if (str_contains($haystack, 'lesson 1')) {
+        $score += 120;
+      }
+      if (str_contains($haystack, 'lesson 2')) {
         $score += 120;
       }
       if (str_contains($haystack, 'learn drupal ai')) {

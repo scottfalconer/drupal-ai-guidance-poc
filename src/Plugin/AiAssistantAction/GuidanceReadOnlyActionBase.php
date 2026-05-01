@@ -116,6 +116,7 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
       'For workflow questions, use workflow evidence for the current bundle, current moderation state, states, transitions, and transition permissions. Do not infer publish access from edit access alone.',
       'If current-route Help names a button, link, form, or path, repeat that exact label or path.',
       'For front-page placement questions, do not recommend the generic "Promoted to front page" checkbox unless deterministic context explicitly says the front page is a default/promoted-content listing or a View filter uses that flag. If front-page ownership is unknown, say so and ask a site builder to inspect the front-page route, View, block, or page composition.',
+      'For Learn Drupal AI lesson questions, treat matching packaged lesson Markdown as the lesson source of truth for goals, practice tasks, prompts, success criteria, and recap. Use lesson-specific instructions below only to shape the answer and evaluation labels.',
       'All Learn Drupal AI lesson flows use three stages: overview, guided task, and recap. For lesson overview questions, answer with: What you will learn; What you will practice; How Drupal will check your work; When ready, say "Ok, start Lesson N."; Sources. Do not start the task during the overview.',
       'For Lesson 1 start questions, including "Ok, start Lesson 1", answer as a lesson challenge with: Goal; Practice task; What Drupal concept this teaches; Success criteria; Start here; Sources. The Lesson 1 task is to create exactly one draft Article, verify it in /admin/content, open or preview it, and ask for evaluation. Mention administrator/site-builder work only once as follow-up context for permissions, workflows, Views, and page composition.',
       'For Lesson 1 evaluation questions, answer from lesson_1_evaluation evidence when present. Use result labels: Fully verified, Core task complete, Partially complete, or Cannot confirm. If the draft Article entity is confirmed but /admin/content or preview verification is missing, say Core task complete, not Complete. If current entity or content-list evidence is missing, say Cannot confirm and ask the user to open the draft Article edit page or /admin/content before asking again.',
@@ -511,7 +512,7 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
 
     $lines = [
       'Source evidence follows. Use the display citation IDs shown in the source bullets; do not expose internal source IDs.',
-      'Source bullets include provenance. Linked source bullets point to local Help/Help Topic pages, trusted package docs, module-owned context, or public documentation when a safe URL is available.',
+      'Source bullets include provenance. Linked source bullets point to local Help/Help Topic pages, packaged lesson Markdown, trusted package docs, module-owned context, or public documentation when a safe URL is available.',
     ];
     $sources = array_slice(array_values($sources), 0, $limit);
     $source_bullets = [];
@@ -666,6 +667,7 @@ abstract class GuidanceReadOnlyActionBase extends AiAssistantActionBase {
     return match ($source->type) {
       'route_help' => 'installed Drupal module help for the current page',
       'help_topic' => 'Drupal Help Topic from an installed module',
+      'lesson_package' => 'packaged Learn Drupal AI lesson Markdown from an installed module',
       'ccc_context_item' => 'Context Control Center policy context selected for this request',
       'site_architecture_context' => 'site architecture summary generated from Drupal configuration',
       'site_configuration_summary' => 'read-only summary of live Drupal configuration',

@@ -80,7 +80,11 @@ final class MarkdownGuidanceParser {
       metadata: $metadata + [
         'package' => $package,
         'path' => $relative_path,
-        'source_class' => $source_type === 'best_practices' ? 'best_practices' : 'generic_guidance',
+        'source_class' => match ($source_type) {
+          'best_practices' => 'best_practices',
+          'lesson_package' => 'lesson_package',
+          default => 'generic_guidance',
+        },
       ],
       accessNotes: ['Markdown guidance file is public package content.'],
       tokenEstimate: GuidanceSource::estimateTokens($text),

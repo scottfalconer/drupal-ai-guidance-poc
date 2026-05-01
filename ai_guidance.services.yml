@@ -127,6 +127,13 @@ services:
       $renderer: '@renderer'
       $logger: '@logger.channel.ai_guidance'
 
+  Drupal\ai_guidance\Source\LessonSourceProvider:
+    arguments:
+      $moduleHandler: '@module_handler'
+      $moduleExtensionList: '@extension.list.module'
+      $parser: '@ai_guidance.markdown_parser'
+      $logger: '@logger.channel.ai_guidance'
+
   Drupal\ai_guidance\Source\SiteConfigurationSourceProvider:
     arguments:
       $configFactory: '@config.factory'

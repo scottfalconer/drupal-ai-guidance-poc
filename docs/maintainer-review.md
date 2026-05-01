@@ -40,6 +40,10 @@ Evidence providers should:
 documents such as Help Topics or policy context. New Drupal introspection should
 prefer evidence providers.
 
+Human-authored Learn Drupal AI lessons should be packaged as Markdown files in
+`guidance_lessons/*.md` with YAML front matter. This keeps lessons portable for
+outside tools while letting Drupal expose them as `lesson_package` sources.
+
 `GuidanceSourceProviderInterface` is internal to the current source-action
 pipeline and should not be treated as the long-term extension point.
 

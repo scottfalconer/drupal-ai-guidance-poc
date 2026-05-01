@@ -38,6 +38,23 @@ expectations, and the final review-packet checklist, see
   dedicated read-only Drupal Guidance Assistant using the context actions. This
   submodule is experimental demo support, not the production install path.
 
+## Packaged lessons
+
+Learn Drupal AI-style lessons are packaged as hand-editable Markdown files with
+YAML front matter in `guidance_lessons/*.md`. Drupal can use those files as
+trusted AI Assistant sources, and other tools can parse the same Markdown
+without rendering Drupal Help Topic Twig.
+
+The bundled Lesson 1 and Lesson 2 packages live in:
+
+```text
+guidance_lessons/lesson_1_safe_draft_content.md
+guidance_lessons/lesson_2_context_control_center.md
+```
+
+See [`docs/lessons.md`](docs/lessons.md) for the front matter fields, expected
+Markdown shape, and extension pattern for other modules.
+
 ## Install on Drupal CMS
 
 AI Guidance was validated on a clean Drupal CMS 2.x site with Drupal core 11.3,
@@ -133,13 +150,13 @@ surface behavior.
 The demo assistant injects guidance through the AI Assistant action context API
 before the first model call. It does not expose executable actions.
 
-The first demo prompt is intentionally framed as a Learn Drupal AI-style lesson:
-`Show me the Lesson 1 overview.` The overview should explain what the learner
-will learn, then ask the learner to reply `Ok, start Lesson 1.` The guided task
-and recap should ground the lesson in the current page, role, permissions, and
-Help Topic source instead of giving generic AI training advice. Each lesson
-should follow the same arc: overview, guided task, evidence-based evaluation,
-recap.
+The first demo prompt is intentionally framed as a packaged Learn Drupal
+AI-style lesson: `Show me the Lesson 1 overview.` The overview should explain
+what the learner will learn, then ask the learner to reply `Ok, start Lesson 1.`
+The guided task and recap should ground the lesson in the current page, role,
+permissions, and packaged lesson source instead of giving generic AI training
+advice. Each lesson should follow the same arc: overview, guided task,
+evidence-based evaluation, recap.
 
 Lesson 2 demonstrates module-provided policy context: Context Control Center
 ([`ai_context`](https://www.drupal.org/project/ai_context)) can provide brand

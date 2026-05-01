@@ -96,7 +96,49 @@ final class GuidanceReadOnlyActionBaseTest extends UnitTestCase {
 
     $this->assertContains('- [H1] [Safe AI configuration for content editors](/admin/help/topic/ai_guidance.safe_editor_ai) — Drupal Help Topic from an installed module', $lines);
     $this->assertContains('Source evidence follows. Use the display citation IDs shown in the source bullets; do not expose internal source IDs.', $lines);
-    $this->assertContains('Source bullets include provenance. Linked source bullets point to local Help/Help Topic pages, trusted package docs, module-owned context, or public documentation when a safe URL is available.', $lines);
+    $this->assertContains('Source bullets include provenance. Linked source bullets point to local Help/Help Topic pages, packaged lesson Markdown, trusted package docs, module-owned context, or public documentation when a safe URL is available.', $lines);
+  }
+
+  /**
+   * Tests packaged lessons have plain provenance in source bullets.
+   */
+  public function testLessonPackageSourceProvenance(): void {
+    $action = new class(
+      [],
+      $this->createMock(PrivateTempStoreFactory::class),
+      $this->createMock(AccountProxyInterface::class),
+      new RequestStack(),
+      new GuidanceRedactor(),
+    ) extends GuidanceReadOnlyActionBase {
+
+      /**
+       * {@inheritdoc}
+       */
+      public function listContexts(): array {
+        return [];
+      }
+
+      /**
+       * Exposes source line formatting for tests.
+       */
+      public function exposeSourceLines(array $sources, string $prefix = 'H'): array {
+        return $this->sourceLines($sources, $prefix, 1);
+      }
+
+    };
+
+    $lines = $action->exposeSourceLines([
+      new GuidanceSource(
+        id: 'ai_guidance:guidance_lessons/lesson_1_safe_draft_content.md',
+        canonicalId: 'ai_guidance.lesson_1_safe_draft_content',
+        title: 'Lesson 1: Create and verify draft content using your role',
+        type: 'lesson_package',
+        text: '## What You Will Learn',
+        citations: ['source_url' => '/admin/help/topic/ai_guidance.lesson_1_safe_drupal_ai'],
+      ),
+    ]);
+
+    $this->assertContains('- [H1] [Lesson 1: Create and verify draft content using your role](/admin/help/topic/ai_guidance.lesson_1_safe_drupal_ai) — packaged Learn Drupal AI lesson Markdown from an installed module', $lines);
   }
 
   /**

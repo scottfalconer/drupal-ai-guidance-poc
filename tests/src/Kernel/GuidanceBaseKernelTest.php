@@ -10,6 +10,7 @@ use Drupal\ai_guidance\Evidence\GuidanceEvidenceCollector;
 use Drupal\ai_guidance\Prompt\GuidanceRedactor;
 use Drupal\ai_guidance\Source\HelpTopicsSourceProvider;
 use Drupal\ai_guidance\Source\HookHelpSourceProvider;
+use Drupal\ai_guidance\Source\LessonSourceProvider;
 use Drupal\ai_guidance\Source\SiteConfigurationSourceProvider;
 use Drupal\ai_guidance\State\CurrentEntityStateProvider;
 use Drupal\ai_guidance\State\CurrentRouteStateProvider;
@@ -60,11 +61,30 @@ final class GuidanceBaseKernelTest extends KernelTestBase {
       EnabledModulesStateProvider::class,
       HookHelpSourceProvider::class,
       HelpTopicsSourceProvider::class,
+      LessonSourceProvider::class,
       SiteConfigurationSourceProvider::class,
     ] as $service_id) {
       $this->assertTrue($this->container->has($service_id), sprintf('Service %s is registered.', $service_id));
       $this->assertIsObject($this->container->get($service_id));
     }
+  }
+
+  /**
+   * Tests packaged Markdown lessons are discoverable in Drupal.
+   */
+  public function testBundledMarkdownLessonsAreDiscoverable(): void {
+    $provider = $this->container->get(LessonSourceProvider::class);
+    $this->assertInstanceOf(LessonSourceProvider::class, $provider);
+
+    $sources = iterator_to_array($provider->getSources(
+      new GuidanceRequest('Show me the Lesson 1 overview.', new AnonymousUserSession()),
+      new GuidanceState([]),
+    ));
+
+    $this->assertCount(1, $sources);
+    $this->assertSame('lesson_package', $sources[0]->type);
+    $this->assertSame('ai_guidance.lesson_1_safe_draft_content', $sources[0]->canonicalId);
+    $this->assertStringContainsString('What You Will Learn', $sources[0]->text);
   }
 
   /**
