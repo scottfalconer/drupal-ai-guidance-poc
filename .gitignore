@@ -3,7 +3,11 @@ test_outputs/
 __pycache__/
 *.pyc
 .phpunit.result.cache
+.phpunit.cache/
+.phpstan.result-cache
 .drupal-contribute-fix/
+.demo-logs/
+.demo-recordings/
 /vendor/
 /web/
 /docroot/

@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<ruleset name="AI Guidance">
+  <description>Drupal coding standards for AI Guidance.</description>
+
+  <arg name="extensions" value="php,module,inc,install,test,profile,theme"/>
+  <arg name="colors"/>
+
+  <file>ai_guidance.module</file>
+  <file>src</file>
+  <file>modules</file>
+  <file>tests</file>
+
+  <exclude-pattern>vendor/*</exclude-pattern>
+  <exclude-pattern>web/*</exclude-pattern>
+  <exclude-pattern>docroot/*</exclude-pattern>
+  <exclude-pattern>.demo-logs/*</exclude-pattern>
+  <exclude-pattern>.demo-recordings/*</exclude-pattern>
+  <exclude-pattern>test_outputs/*</exclude-pattern>
+
+  <rule ref="Drupal"/>
+  <rule ref="DrupalPractice"/>
+</ruleset>

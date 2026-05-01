@@ -9,6 +9,8 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\ai_guidance\Value\GuidanceRequest;
 use Drupal\user\PermissionHandlerInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Provides access-safe current user state.
@@ -35,11 +37,18 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
     'view own unpublished content',
   ];
 
+  /**
+   * Logger for sanitized permission diagnostics.
+   */
+  private readonly LoggerInterface $logger;
+
   public function __construct(
     private readonly AccountProxyInterface $currentUser,
     private readonly ConfigFactoryInterface $configFactory,
     private readonly ?PermissionHandlerInterface $permissionHandler = NULL,
+    ?LoggerInterface $logger = NULL,
   ) {
+    $this->logger = $logger ?? new NullLogger();
   }
 
   /**
@@ -109,7 +118,10 @@ final class CurrentUserStateProvider implements GuidanceStateProviderInterface {
     try {
       $permissions = $this->permissionHandler->getPermissions();
     }
-    catch (\Throwable) {
+    catch (\Throwable $exception) {
+      $this->logger->debug('Permission registry lookup failed with @class.', [
+        '@class' => get_debug_type($exception),
+      ]);
       return $catalog;
     }
 

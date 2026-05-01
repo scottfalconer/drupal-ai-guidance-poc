@@ -8,6 +8,8 @@ use Drupal\Component\Serialization\Json;
 use Drupal\ai_guidance\Prompt\GuidanceRedactor;
 use Drupal\ai_guidance\Value\GuidanceRequest;
 use Drupal\ai_guidance\Value\GuidanceState;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Aggregates safe state from tagged providers.
@@ -30,8 +32,15 @@ final class GuidanceStateAggregator {
   public function __construct(
     private readonly iterable $providers,
     private readonly GuidanceRedactor $redactor,
+    ?LoggerInterface $logger = NULL,
   ) {
+    $this->logger = $logger ?? new NullLogger();
   }
+
+  /**
+   * Logger for sanitized provider diagnostics.
+   */
+  private readonly LoggerInterface $logger;
 
   /**
    * Builds safe state.
@@ -45,7 +54,15 @@ final class GuidanceStateAggregator {
     $state = [];
     foreach ($this->providers as $provider) {
       assert($provider instanceof GuidanceStateProviderInterface);
-      $state = array_replace_recursive($state, $provider->getState($request));
+      try {
+        $state = array_replace_recursive($state, $provider->getState($request));
+      }
+      catch (\Throwable $exception) {
+        $this->logger->debug('Guidance state provider @provider failed with @class.', [
+          '@provider' => get_debug_type($provider),
+          '@class' => get_debug_type($exception),
+        ]);
+      }
     }
 
     $redacted = $this->redactor->redactArray($state);

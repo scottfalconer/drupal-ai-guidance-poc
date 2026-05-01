@@ -7,3 +7,4 @@ services:
     arguments:
       $selector: '@ai_context.selector'
       $siteArchitectureRepository: '@?ai_context_site_architecture.contract_repository'
+      $logger: '@logger.channel.ai_guidance'

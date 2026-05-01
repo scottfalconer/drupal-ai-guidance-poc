@@ -1,23 +1,66 @@
 ---
-label: 'Lesson 1: Use Drupal AI safely on this site'
+label: 'Lesson 1: Ask what your role can safely do'
 top_level: false
 ---
+<h2>{% trans %}Overview{% endtrans %}</h2>
+<p>{% trans %}Lesson 1 teaches how draft content works on the Drupal site you are using right now. You will practice creating one Article draft, checking where Drupal shows it, and asking the assistant to explain the evidence behind the result.{% endtrans %}</p>
+<p>{% trans %}The learning pattern is: orient yourself on the current page, practice a small editor task, then reflect on what Drupal evidence proved.{% endtrans %}</p>
+
+<h2>{% trans %}Lesson flow{% endtrans %}</h2>
+<ol>
+  <li>{% trans %}Ask for the overview: <em>Show me the Lesson 1 overview.</em>{% endtrans %}</li>
+  <li>{% trans %}Begin the guided task: <em>Ok, start Lesson 1.</em>{% endtrans %}</li>
+  <li>{% trans %}Complete the task manually in Drupal.{% endtrans %}</li>
+  <li>{% trans %}Ask for evaluation: <em>Evaluate my Lesson 1 attempt. Did I complete the task safely?</em>{% endtrans %}</li>
+  <li>{% trans %}Ask for the recap: <em>Recap Lesson 1.</em>{% endtrans %}</li>
+</ol>
+
 <h2>{% trans %}Goal{% endtrans %}</h2>
-<p>{% trans %}Learn the first safe pattern for using AI inside Drupal: ask what the current role can do before asking for configuration, publishing, permission, or site-building changes.{% endtrans %}</p>
+<p>{% trans %}Learn how a content editor can create and verify draft content using the site's actual content model, workflow, and permissions.{% endtrans %}</p>
 
-<h2>{% trans %}Why this matters{% endtrans %}</h2>
-<p>{% trans %}Drupal behavior depends on live site state: routes, roles, permissions, content types, workflows, Views, forms, blocks, Help, and module configuration. A useful AI answer should explain what is true on this site, what the current user can do, what requires an administrator or site builder, and which source supports the answer.{% endtrans %}</p>
+<h2>{% trans %}Scenario{% endtrans %}</h2>
+<p>{% trans %}You are a content editor learning how this Drupal site works. Your first task is to create one draft, confirm where it appears, and understand why that is different from publishing or homepage placement.{% endtrans %}</p>
 
-<h2>{% trans %}Exercise{% endtrans %}</h2>
-<p>{% trans %}Open a page where you can work, such as a content add form or the content administration page, and ask: <em>What can I do on this page?</em> Then ask: <em>Why can I draft content, but not configure AI providers or permissions?</em>{% endtrans %}</p>
+<h2>{% trans %}Task{% endtrans %}</h2>
+<p>{% trans %}Create exactly one draft Article, verify it in Drupal, then ask the assistant to evaluate what Drupal can confirm.{% endtrans %}</p>
+
+<h2>{% trans %}Steps{% endtrans %}</h2>
+<ol>
+  <li>{% trans %}Go to <code>/node/add/article</code>.{% endtrans %}</li>
+  <li>{% trans %}On that Article creation page, ask the assistant: <em>What can I do on this page?</em>{% endtrans %}</li>
+  <li>{% trans %}Create an Article titled <em>Lesson 1 test article</em>.{% endtrans %}</li>
+  <li>{% trans %}Save it as draft or unpublished.{% endtrans %}</li>
+  <li>{% trans %}Verify that it appears in <code>/admin/content</code>.{% endtrans %}</li>
+  <li>{% trans %}Open or preview the saved Article, then open its edit page.{% endtrans %}</li>
+  <li>{% trans %}On the saved Article edit page, ask the assistant: <em>Evaluate my Lesson 1 attempt. Did I complete the task safely?</em>{% endtrans %}</li>
+</ol>
 
 <h2>{% trans %}Success criteria{% endtrans %}</h2>
 <ul>
-  <li>{% trans %}The answer separates current-user actions from administrator or site-builder actions.{% endtrans %}</li>
-  <li>{% trans %}The answer names the relevant role, permission, workflow, route, or content evidence when available.{% endtrans %}</li>
-  <li>{% trans %}The answer does not tell an editor to change providers, assistant configuration, permissions, workflows, or page composition directly unless the current user has that access.{% endtrans %}</li>
-  <li>{% trans %}The answer gives one safe next step and one way to verify it worked.{% endtrans %}</li>
+  <li>{% trans %}The content uses the existing Article content type.{% endtrans %}</li>
+  <li>{% trans %}The content is draft or unpublished.{% endtrans %}</li>
+  <li>{% trans %}The content appears in <code>/admin/content</code>.{% endtrans %}</li>
+  <li>{% trans %}The content can be opened or previewed for review.{% endtrans %}</li>
+  <li>{% trans %}The learner can explain why draft creation, publishing, and front-page placement are separate Drupal concepts.{% endtrans %}</li>
 </ul>
 
-<h2>{% trans %}Safe boundary{% endtrans %}</h2>
-<p>{% trans %}In this V1 demo, the assistant is read-only. It can explain and guide, but it cannot create content, publish content, change configuration, alter permissions, execute tools, or act as an autonomous agent.{% endtrans %}</p>
+<h2>{% trans %}Reflection questions{% endtrans %}</h2>
+<ul>
+  <li>{% trans %}Why can my role create draft content but not configure AI providers?{% endtrans %}</li>
+  <li>{% trans %}Why does this draft not automatically appear on the public front page?{% endtrans %}</li>
+  <li>{% trans %}What should I ask an administrator or site builder to do next?{% endtrans %}</li>
+</ul>
+
+<h2>{% trans %}What this lesson covers{% endtrans %}</h2>
+<p>{% trans %}This lesson covers editor-facing content work: creating a draft, finding it in Drupal, opening it for review, and asking what Drupal evidence confirms. Administrator and site-builder work, such as AI provider setup, permissions, workflows, Views, and homepage composition, is introduced only as follow-up context.{% endtrans %}</p>
+<p>{% trans %}In this V1 demo, the assistant is read-only. It can explain the page, guide the manual task, and evaluate evidence, while the learner remains responsible for creating and saving the content.{% endtrans %}</p>
+
+<h2>{% trans %}Evaluation prompt{% endtrans %}</h2>
+<p>{% trans %}When you finish, ask: <em>Evaluate my Lesson 1 attempt. Did I complete the task safely, and what evidence should I check?</em>{% endtrans %}</p>
+<p>{% trans %}The assistant may mark the core task complete when it can confirm the saved draft Article, even if it still asks you to verify the <code>/admin/content</code> listing or Preview step. Full verification requires the complete checklist above.{% endtrans %}</p>
+
+<h2>{% trans %}Recap prompt{% endtrans %}</h2>
+<p>{% trans %}After evaluation, ask: <em>Recap Lesson 1.</em> The recap should summarize what you learned, what Drupal evidence was checked, what remains administrator or site-builder work, and the next safe learning step.{% endtrans %}</p>
+
+<h2>{% trans %}Continue the discussion{% endtrans %}</h2>
+<p>{% trans %}Share questions, feedback, and lesson ideas with the Drupal AI learning community in the <em>#ai-learners</em> channel on Drupal Slack.{% endtrans %}</p>

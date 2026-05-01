@@ -1,7 +1,8 @@
 name: AI Guidance - CMS demo
-description: Wires the read-only Drupal Guidance Assistant into the existing AI Assistant chat flow.
+description: Experimental demo setup for the read-only Drupal Guidance Assistant and lesson flows.
 package: AI
 type: module
+lifecycle: experimental
 core_version_requirement: ^10.5 || ^11.2
 configure: ai_guidance_cms_demo.setup
 

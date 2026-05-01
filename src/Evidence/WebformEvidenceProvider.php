@@ -10,16 +10,25 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\ai_guidance\Value\GuidanceEvidence;
 use Drupal\ai_guidance\Value\GuidanceRequest;
 use Drupal\ai_guidance\Value\GuidanceState;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Collects generic Webform evidence when Webform is installed.
  */
 final class WebformEvidenceProvider implements GuidanceEvidenceProviderInterface {
 
+  /**
+   * Logger for sanitized Webform diagnostics.
+   */
+  private readonly LoggerInterface $logger;
+
   public function __construct(
     private readonly ConfigFactoryInterface $configFactory,
     private readonly ModuleHandlerInterface $moduleHandler,
+    ?LoggerInterface $logger = NULL,
   ) {
+    $this->logger = $logger ?? new NullLogger();
   }
 
   /**
@@ -135,7 +144,10 @@ final class WebformEvidenceProvider implements GuidanceEvidenceProviderInterface
       try {
         $elements = Yaml::decode($elements) ?: [];
       }
-      catch (\Throwable) {
+      catch (\Throwable $exception) {
+        $this->logger->debug('Webform element YAML decode failed with @class.', [
+          '@class' => get_debug_type($exception),
+        ]);
         return [];
       }
     }
@@ -209,6 +221,7 @@ final class WebformEvidenceProvider implements GuidanceEvidenceProviderInterface
    */
   private function canInspectWebformConfiguration(GuidanceRequest $request): bool {
     foreach ([
+      'view ai guidance site inventory',
       'administer ai guidance',
       'administer site configuration',
       'administer webform',

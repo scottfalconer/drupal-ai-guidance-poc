@@ -2,3 +2,7 @@ administer ai guidance:
   title: 'Administer AI guidance'
   description: 'View AI guidance debug output and configuration.'
   restrict access: true
+view ai guidance site inventory:
+  title: 'View AI guidance site inventory'
+  description: 'View read-only AI Guidance summaries of content types, fields, workflows, Views, and page composition.'
+  restrict access: true

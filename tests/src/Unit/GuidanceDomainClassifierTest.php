@@ -32,6 +32,15 @@ final class GuidanceDomainClassifierTest extends UnitTestCase {
     $this->assertContains('form_submission', $domains);
     $this->assertNotContains('automation', $domains);
 
+    $domains = $classifier->classify('Evaluate my Lesson 1 attempt. Did I complete it safely?');
+    $this->assertContains('access', $domains);
+    $this->assertContains('workflow', $domains);
+    $this->assertContains('field_model', $domains);
+    $this->assertContains('content_visibility', $domains);
+
+    $domains = $classifier->classify('What editorial guidance applies from our site policy context?');
+    $this->assertContains('ai_feature_access', $domains);
+
     $external = $classifier->externalEvidenceDomains('Why do visitors see stale content behind the CDN?');
     $this->assertSame(['cdn_edge_headers', 'cdn_purge_status'], $external);
   }

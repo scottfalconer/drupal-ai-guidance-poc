@@ -13,17 +13,26 @@ use Drupal\path_alias\AliasManagerInterface;
 use Drupal\ai_guidance\Value\GuidanceRequest;
 use Drupal\ai_guidance\Value\GuidanceSource;
 use Drupal\ai_guidance\Value\GuidanceState;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Provides a compact, access-safe summary of site configuration.
  */
 final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInterface {
 
+  /**
+   * Logger for sanitized site-inventory diagnostics.
+   */
+  private readonly LoggerInterface $logger;
+
   public function __construct(
     private readonly ConfigFactoryInterface $configFactory,
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly ?AliasManagerInterface $aliasManager = NULL,
+    ?LoggerInterface $logger = NULL,
   ) {
+    $this->logger = $logger ?? new NullLogger();
   }
 
   /**
@@ -52,7 +61,10 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
         ? $this->summarizeFrontPage($front_page_path, $request, $node_types, $views)
         : $this->limitedFrontPageSummary($front_page_path, $request);
     }
-    catch (\Throwable) {
+    catch (\Throwable $exception) {
+      $this->logger->debug('Site configuration source assembly failed with @class.', [
+        '@class' => get_debug_type($exception),
+      ]);
       return;
     }
 
@@ -61,7 +73,7 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       '',
       $full_summary
         ? 'This is fallback site inventory for guidance. It is not an authoritative site behavior contract.'
-        : 'The current account lacks site-configuration administration permission. This source omits Views, theme, Canvas internals, and other admin-derived configuration.',
+        : 'The current account lacks permission to view the read-only AI Guidance site inventory. This source omits Views, theme, Canvas internals, and other admin-derived configuration.',
       '',
       '- Site name: `' . ((string) ($site->get('name') ?? 'Drupal')) . '`',
       $full_summary
@@ -203,7 +215,7 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
         'source_class' => 'safe_configuration_summary',
         'authoritative_contract_source' => FALSE,
         'relationship_to_site_architecture' => 'fallback_inventory_not_behavior_contract',
-        'exposure_level' => $full_summary ? 'full_for_site_configuration_admin' : 'limited_for_current_account',
+        'exposure_level' => $full_summary ? 'full_for_guidance_site_inventory_access' : 'limited_for_current_account',
         'node_type_count' => count($node_types),
         'view_count' => count($views),
         'workflow_count' => count($workflows),
@@ -212,7 +224,7 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       accessNotes: [
         $full_summary
           ? 'Fallback configuration inventory only; prefer generated site behavior contracts when ai_context_site_architecture is available.'
-          : 'Limited summary because the current account lacks permission to administer site configuration.',
+          : 'Limited summary because the current account lacks permission to view the read-only AI Guidance site inventory.',
       ],
       cacheability: [
         'tags' => [
@@ -258,6 +270,7 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
     }
 
     foreach ([
+      'view ai guidance site inventory',
       'administer ai guidance',
       'administer ai',
       'administer ai_assistant',
@@ -436,7 +449,10 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
     try {
       return $this->aliasManager->getAliasByPath($path);
     }
-    catch (\Throwable) {
+    catch (\Throwable $exception) {
+      $this->logger->debug('Path alias lookup failed with @class.', [
+        '@class' => get_debug_type($exception),
+      ]);
       return $path;
     }
   }
@@ -449,7 +465,11 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
     try {
       return $entity->access('view', $account, TRUE)->isAllowed();
     }
-    catch (\Throwable) {
+    catch (\Throwable $exception) {
+      $this->logger->debug('Entity view access check for @entity_type failed with @class.', [
+        '@entity_type' => $entity->getEntityTypeId(),
+        '@class' => get_debug_type($exception),
+      ]);
       return FALSE;
     }
   }
@@ -467,7 +487,11 @@ final class SiteConfigurationSourceProvider implements GuidanceSourceProviderInt
       }
       return $entity->toUrl('edit-form')->toString();
     }
-    catch (\Throwable) {
+    catch (\Throwable $exception) {
+      $this->logger->debug('Entity edit-path lookup for @entity_type failed with @class.', [
+        '@entity_type' => $entity->getEntityTypeId(),
+        '@class' => get_debug_type($exception),
+      ]);
       return '';
     }
   }

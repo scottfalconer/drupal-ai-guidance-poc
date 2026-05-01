@@ -6,6 +6,12 @@ namespace Drupal\ai_guidance\Value;
 
 /**
  * Safe normalized state for AI Assistant guidance contexts.
+ *
+ * GuidanceState is the permission-filtered, redacted snapshot shared with
+ * evidence and source providers for one assistant request. Treat values as
+ * current-account evidence, not as a cross-site configuration dump.
+ *
+ * @api
  */
 final class GuidanceState {
 

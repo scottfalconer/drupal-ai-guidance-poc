@@ -12,6 +12,7 @@ use Drupal\ai_guidance\Plugin\AiAssistantAction\GuidanceReadOnlyActionBase;
 use Drupal\ai_guidance\Prompt\GuidanceRedactor;
 use Drupal\ai_guidance\State\GuidanceStateAggregator;
 use Drupal\ai_guidance_best_practices\Source\BestPracticesSourceProvider;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -35,8 +36,9 @@ final class BestPracticesContextAction extends GuidanceReadOnlyActionBase {
     GuidanceRedactor $redactor,
     private readonly GuidanceStateAggregator $stateAggregator,
     private readonly BestPracticesSourceProvider $sourceProvider,
+    ?LoggerInterface $logger = NULL,
   ) {
-    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack, $redactor);
+    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack, $redactor, $logger);
   }
 
   /**
@@ -51,6 +53,7 @@ final class BestPracticesContextAction extends GuidanceReadOnlyActionBase {
       $container->get('ai_guidance.redactor'),
       $container->get('ai_guidance.state_aggregator'),
       $container->get(BestPracticesSourceProvider::class),
+      $container->get('logger.channel.ai_guidance'),
     );
   }
 

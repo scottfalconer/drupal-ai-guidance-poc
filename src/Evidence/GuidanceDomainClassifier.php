@@ -113,8 +113,13 @@ final class GuidanceDomainClassifier {
       'ai_feature_access' => [
         'ai',
         'assistant',
+        'brand voice',
         'chatbot',
+        'context control center',
+        'editorial guidance',
+        'policy context',
         'provider',
+        'site policy',
       ],
       'outside_agent_handoff' => [
         'agent',
@@ -131,6 +136,20 @@ final class GuidanceDomainClassifier {
       if ($this->containsAny($question, $needles)) {
         $domains[] = $domain;
       }
+    }
+
+    if ($this->containsAny($question, [
+      'lesson',
+      'lesson 1',
+      'evaluate my',
+      'evaluate this',
+      'did i complete',
+      'attempt',
+    ])) {
+      $domains[] = 'access';
+      $domains[] = 'workflow';
+      $domains[] = 'field_model';
+      $domains[] = 'content_visibility';
     }
 
     if (str_contains($question, 'what happens when')

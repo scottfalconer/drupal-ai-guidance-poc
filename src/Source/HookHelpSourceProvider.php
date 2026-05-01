@@ -11,17 +11,26 @@ use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\ai_guidance\Value\GuidanceRequest;
 use Drupal\ai_guidance\Value\GuidanceSource;
 use Drupal\ai_guidance\Value\GuidanceState;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Provides source documents from hook_help().
  */
 final class HookHelpSourceProvider implements GuidanceSourceProviderInterface {
 
+  /**
+   * Logger for sanitized source diagnostics.
+   */
+  private readonly LoggerInterface $logger;
+
   public function __construct(
     private readonly ModuleHandlerInterface $moduleHandler,
     private readonly RouteMatchInterface $routeMatch,
     private readonly RendererInterface $renderer,
+    ?LoggerInterface $logger = NULL,
   ) {
+    $this->logger = $logger ?? new NullLogger();
   }
 
   /**
@@ -55,7 +64,12 @@ final class HookHelpSourceProvider implements GuidanceSourceProviderInterface {
       try {
         $help = $this->moduleHandler->invoke($module, 'help', [$route_name, $this->routeMatch]);
       }
-      catch (\Throwable) {
+      catch (\Throwable $exception) {
+        $this->logger->debug('Skipped hook_help() for module @module on route @route after @class.', [
+          '@module' => $module,
+          '@route' => $route_name,
+          '@class' => get_debug_type($exception),
+        ]);
         continue;
       }
       if (empty($help)) {

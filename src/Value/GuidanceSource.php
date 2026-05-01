@@ -6,6 +6,13 @@ namespace Drupal\ai_guidance\Value;
 
 /**
  * Trusted source document used to ground guidance answers.
+ *
+ * Source documents are a lower-level, read-only bridge for Help Topics,
+ * hook_help(), package guidance, and optional module-owned policy context. New
+ * integrations should prefer GuidanceEvidenceProviderInterface unless they are
+ * contributing a human-authored source document with citations.
+ *
+ * @api
  */
 final class GuidanceSource {
 

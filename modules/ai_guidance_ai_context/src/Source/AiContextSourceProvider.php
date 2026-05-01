@@ -9,11 +9,18 @@ use Drupal\ai_guidance\Source\GuidanceTextNormalizer;
 use Drupal\ai_guidance\Value\GuidanceRequest;
 use Drupal\ai_guidance\Value\GuidanceSource;
 use Drupal\ai_guidance\Value\GuidanceState;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Provides Context Control Center items as read-only guidance sources.
  */
 final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
+
+  /**
+   * Logger for sanitized Context Control Center diagnostics.
+   */
+  private readonly LoggerInterface $logger;
 
   /**
    * Constructs the source provider.
@@ -24,7 +31,9 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
   public function __construct(
     private readonly object $selector,
     private readonly ?object $siteArchitectureRepository = NULL,
+    ?LoggerInterface $logger = NULL,
   ) {
+    $this->logger = $logger ?? new NullLogger();
   }
 
   /**
@@ -39,6 +48,10 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
    * Gets selected Context Control Center sources.
    */
   private function getContextSources(GuidanceRequest $request, GuidanceState $state): iterable {
+    if (!$this->questionNeedsPolicyContext($request->question)) {
+      return;
+    }
+
     if (!method_exists($this->selector, 'select')) {
       return;
     }
@@ -84,22 +97,29 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
         $token_estimate = GuidanceSource::estimateTokens($text);
       }
     }
-    catch (\Throwable) {
+    catch (\Throwable $exception) {
+      $this->logger->debug('Context Control Center selection failed with @class.', [
+        '@class' => get_debug_type($exception),
+      ]);
       return;
     }
     if ($text === '' || $ids === []) {
       return;
     }
 
+    $policy_title = $this->contextPolicyTitle($text);
+    $policy_text = $this->contextPolicyText($text);
+
     yield new GuidanceSource(
       id: 'ccc_context:' . implode(',', $ids),
       canonicalId: 'ccc_context.' . implode('.', $ids),
-      title: 'Context Control Center guidance',
+      title: $policy_title,
       type: 'ccc_context_item',
-      text: $text,
+      text: $policy_text,
       priority: 70,
       citations: [
         'ai_context_item_ids' => $ids,
+        'source' => 'Context Control Center selector',
       ],
       metadata: [
         'scope' => 'selected_by_ccc',
@@ -107,11 +127,117 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
         'always_include_or_selected' => 'selected',
         'access_result' => 'access_checked_by_ai_context_selector',
         'source_class' => 'ccc_context',
+        'context_kind' => 'site_policy',
+        'not_authorization' => TRUE,
+        'selected_item_count' => count($ids),
+        'policy_signals' => $this->policySignals($text),
       ],
-      accessNotes: ['CCC selector applied access checks and target scoping.'],
+      accessNotes: [
+        'CCC selector applied access checks and target scoping.',
+        'This is site policy context; it guides assistant output but does not grant permissions or authorize content/configuration changes.',
+      ],
       cacheability: $cacheability,
-      tokenEstimate: $token_estimate,
+      tokenEstimate: GuidanceSource::estimateTokens($policy_text) ?: $token_estimate,
     );
+  }
+
+  /**
+   * Determines whether selected CCC policy text is relevant to the question.
+   */
+  private function questionNeedsPolicyContext(string $question): bool {
+    $question = strtolower($question);
+
+    if (str_contains($question, 'lesson 1')) {
+      return FALSE;
+    }
+
+    $needles = [
+      'lesson 2',
+      'context control center',
+      'context setup',
+      'policy context',
+      'editorial policy',
+      'editorial guidance',
+      'brand voice',
+      'site policy',
+      'voice',
+      'tone',
+      'accessibility',
+      'draft title',
+      'draft body',
+      'suggest improvements',
+      'revise',
+      'without changing the meaning',
+    ];
+    foreach ($needles as $needle) {
+      if (str_contains($question, $needle)) {
+        return TRUE;
+      }
+    }
+
+    return FALSE;
+  }
+
+  /**
+   * Builds a human-readable title for selected CCC policy context.
+   */
+  private function contextPolicyTitle(string $text): string {
+    foreach (preg_split('/\R/', $text) ?: [] as $line) {
+      $line = trim(strip_tags($line));
+      $line = preg_replace('/^#+\s*/', '', $line) ?? $line;
+      $line = preg_replace('/^label:\s*/i', '', $line) ?? $line;
+      $line = trim($line, " \t\n\r\0\x0B:-");
+      if ($line === '' || strlen($line) > 120) {
+        continue;
+      }
+      if (preg_match('/\b(policy|voice|editorial|brand|governance|guidance)\b/i', $line)) {
+        return 'Context policy: ' . $line;
+      }
+    }
+
+    return 'Context policy from Context Control Center';
+  }
+
+  /**
+   * Adds the Track A guardrail to selected CCC policy text.
+   */
+  private function contextPolicyText(string $text): string {
+    return GuidanceTextNormalizer::normalize(<<<TEXT
+# Context Control Center policy context
+
+This source is site policy context. It guides AI suggestions; it does not grant permissions, authorize publishing, configure AI providers, change model settings, change assistant prompts, alter workflows, edit Views, modify page composition, trigger automation, or replace human editorial review.
+
+$text
+TEXT);
+  }
+
+  /**
+   * Summarizes the kinds of policy signals present in the context text.
+   *
+   * @return string[]
+   *   Policy signal labels.
+   */
+  private function policySignals(string $text): array {
+    $text = strtolower($text);
+    $signals = [];
+    $rules = [
+      'brand_voice' => ['brand', 'voice', 'tone'],
+      'editorial_standards' => ['editorial', 'plain language', 'instructions', 'headings'],
+      'accessibility' => ['accessibility', 'alt text', 'link text', 'wcag'],
+      'governance' => ['governance', 'policy', 'review', 'approval'],
+      'draft_only_ai' => ['draft assistance', 'should not publish', 'not publish', 'do not publish'],
+      'admin_boundary' => ['permissions', 'provider', 'model settings', 'workflows', 'views', 'automation'],
+    ];
+    foreach ($rules as $signal => $needles) {
+      foreach ($needles as $needle) {
+        if (str_contains($text, $needle)) {
+          $signals[] = $signal;
+          break;
+        }
+      }
+    }
+
+    return array_values(array_unique($signals));
   }
 
   /**
@@ -127,7 +253,10 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
     try {
       $contracts = $repository->list(FALSE);
     }
-    catch (\Throwable) {
+    catch (\Throwable $exception) {
+      $this->logger->debug('Site architecture contract listing failed with @class.', [
+        '@class' => get_debug_type($exception),
+      ]);
       return;
     }
     if (!is_array($contracts) || $contracts === []) {
@@ -174,7 +303,7 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
       yield new GuidanceSource(
         id: 'site_architecture:surface_index',
         canonicalId: 'site_architecture.surface_index',
-        title: 'Generated site architecture surface index',
+        title: 'Site architecture summary',
         type: 'site_architecture_context',
         text: $surface_index_text,
         priority: 68,
@@ -326,7 +455,10 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
         }
       }
     }
-    catch (\Throwable) {
+    catch (\Throwable $exception) {
+      $this->logger->debug('Site architecture contract payload lookup failed with @class.', [
+        '@class' => get_debug_type($exception),
+      ]);
       return $contract;
     }
 
@@ -591,6 +723,7 @@ final class AiContextSourceProvider implements GuidanceSourceProviderInterface {
    */
   private function canInspectSiteArchitectureDetails(GuidanceRequest $request): bool {
     foreach ([
+      'view ai guidance site inventory',
       'administer ai guidance',
       'administer site configuration',
     ] as $permission) {

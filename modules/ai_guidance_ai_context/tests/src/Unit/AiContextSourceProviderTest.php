@@ -19,6 +19,91 @@ use Drupal\ai_guidance_ai_context\Source\AiContextSourceProvider;
 final class AiContextSourceProviderTest extends UnitTestCase {
 
   /**
+   * Tests CCC policy context is labeled and guarded as policy, not authority.
+   */
+  public function testCccPolicyContextUsesHumanReadableCitationAndGuardrail(): void {
+    $selector = new class {
+      /**
+       * Selects CCC context for older selector signatures.
+       *
+       * @return array<string, mixed>
+       *   Selection result.
+       */
+      public function select(string $question, string $scope = '', array $always_include = [], int $max_items = 5, ?array $current_entity = NULL): array {
+        return [
+          'text' => "# Umami editorial voice and AI usage policy\n\nUse a warm, practical voice for home cooks. Flag accessibility concerns such as vague link text. AI output is draft assistance only and should not publish content or change permissions.",
+          'ids' => ['policy-1'],
+        ];
+      }
+    };
+
+    $provider = new AiContextSourceProvider($selector);
+    $sources = iterator_to_array($provider->getSources(
+      new GuidanceRequest(
+        question: 'What editorial guidance applies to this Article draft?',
+        account: $this->accountWithPermissions([]),
+      ),
+      new GuidanceState([
+        'entity' => [
+          'type' => 'node',
+          'id' => 123,
+        ],
+      ]),
+    ));
+
+    self::assertCount(1, $sources);
+    $source = $sources[0];
+    self::assertSame('Context policy: Umami editorial voice and AI usage policy', $source->title);
+    self::assertSame('ccc_context_item', $source->type);
+    self::assertSame('site_policy', $source->metadata['context_kind']);
+    self::assertTrue($source->metadata['not_authorization']);
+    self::assertSame(['policy-1'], $source->citations['ai_context_item_ids']);
+    self::assertContains('accessibility', $source->metadata['policy_signals']);
+    self::assertContains('draft_only_ai', $source->metadata['policy_signals']);
+    self::assertStringContainsString('This source is site policy context.', $source->text);
+    self::assertStringContainsString('does not grant permissions', $source->text);
+    self::assertStringContainsString('Umami editorial voice and AI usage policy', $source->text);
+  }
+
+  /**
+   * Tests policy context is not injected into unrelated lesson prompts.
+   */
+  public function testCccPolicyContextIsSkippedForLessonOneQuestions(): void {
+    $selector = new class {
+      /**
+       * Tracks whether selection was attempted.
+       */
+      public int $calls = 0;
+
+      /**
+       * Selects CCC context for older selector signatures.
+       *
+       * @return array<string, mixed>
+       *   Selection result.
+       */
+      public function select(string $question, string $scope = '', array $always_include = [], int $max_items = 5, ?array $current_entity = NULL): array {
+        $this->calls++;
+        return [
+          'text' => '# Umami editorial voice and AI usage policy',
+          'ids' => ['policy-1'],
+        ];
+      }
+    };
+
+    $provider = new AiContextSourceProvider($selector);
+    $sources = iterator_to_array($provider->getSources(
+      new GuidanceRequest(
+        question: 'Start Lesson 1: Ask Drupal what my role can safely do.',
+        account: $this->accountWithPermissions([]),
+      ),
+      new GuidanceState([]),
+    ));
+
+    self::assertSame([], $sources);
+    self::assertSame(0, $selector->calls);
+  }
+
+  /**
    * Tests site behavior contracts keep their operating-contract fields.
    */
   public function testSiteArchitectureProjectionIncludesOperatingContractFields(): void {

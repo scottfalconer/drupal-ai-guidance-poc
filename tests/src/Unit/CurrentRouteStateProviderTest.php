@@ -56,6 +56,7 @@ final class CurrentRouteStateProviderTest extends UnitTestCase {
     ));
 
     $this->assertTrue($state['route']['access_allowed']);
+    $this->assertSame(['node_type' => 'article'], $state['route']['parameters']);
 
     $access_by_path = [];
     foreach ($state['common_path_access'] as $access) {
@@ -99,6 +100,7 @@ final class CurrentRouteStateProviderTest extends UnitTestCase {
     ));
 
     $this->assertSame('/node/add/article', $state['route']['path']);
+    $this->assertSame(['node_type' => 'article'], $state['route']['parameters']);
     $this->assertSame('caller_context', $state['request_context']['source']);
     $this->assertTrue($state['request_context']['route_resolved_from_context']);
     $this->assertSame('/node/add/article', $state['request_context']['requested_path_access']['path']);
@@ -136,6 +138,130 @@ final class CurrentRouteStateProviderTest extends UnitTestCase {
     $this->assertSame('current_request', $state['request_context']['source']);
     $this->assertFalse($state['request_context']['route_resolved_from_context']);
     $this->assertNull($state['request_context']['requested_path_access']);
+  }
+
+  /**
+   * Tests Lesson evaluation questions include path access evidence.
+   */
+  public function testLessonEvaluationIncludesCommonPathAccess(): void {
+    $route_match = $this->createMock(RouteMatchInterface::class);
+    $route_match->method('getRouteName')->willReturn('entity.node.edit_form');
+    $route_match->method('getRawParameters')->willReturn(new InputBag(['node' => '123']));
+
+    $current_path = $this->createMock(CurrentPathStack::class);
+    $current_path->method('getPath')->willReturn('/node/123/edit');
+
+    $router = $this->createMock(UrlMatcherInterface::class);
+    $router->method('match')->willReturnCallback(static fn(string $path): array => match ($path) {
+      '/node/123/edit' => ['_route' => 'entity.node.edit_form', 'node' => '123'],
+      '/admin/config/ai' => ['_route' => 'ai.settings'],
+      '/admin/people/permissions' => ['_route' => 'user.admin_permissions'],
+      default => throw new ResourceNotFoundException(),
+    });
+
+    $access_manager = $this->createMock(AccessManagerInterface::class);
+    $access_manager->method('checkNamedRoute')
+      ->willReturnCallback(static fn(string $route_name): bool => $route_name === 'entity.node.edit_form');
+
+    $account = $this->createMock(AccountInterface::class);
+    $account->method('hasPermission')->willReturn(FALSE);
+    $provider = new CurrentRouteStateProvider($route_match, $current_path, $router, $access_manager, $account);
+
+    $state = $provider->getState(new GuidanceRequest(
+      'Evaluate my Lesson 1 attempt. Did I complete the task safely?',
+      $account,
+    ));
+
+    $this->assertArrayHasKey('common_path_access', $state);
+    $this->assertSame('/node/123/edit', $state['common_path_access'][0]['path']);
+    $this->assertTrue($state['common_path_access'][0]['access_allowed']);
+  }
+
+  /**
+   * Tests visible page messages from caller context are included safely.
+   */
+  public function testVisiblePageMessagesFromContext(): void {
+    $route_match = $this->createMock(RouteMatchInterface::class);
+    $route_match->method('getRouteName')->willReturn('entity.node.edit_form');
+    $route_match->method('getRawParameters')->willReturn(new InputBag(['node' => '123']));
+
+    $current_path = $this->createMock(CurrentPathStack::class);
+    $current_path->method('getPath')->willReturn('/node/123/edit');
+
+    $router = $this->createMock(UrlMatcherInterface::class);
+    $router->method('match')->willReturn(['_route' => 'entity.node.edit_form', 'node' => '123']);
+
+    $access_manager = $this->createMock(AccessManagerInterface::class);
+    $access_manager->method('checkNamedRoute')->willReturn(TRUE);
+
+    $account = $this->createMock(AccountInterface::class);
+    $account->method('hasPermission')->willReturn(FALSE);
+    $provider = new CurrentRouteStateProvider($route_match, $current_path, $router, $access_manager, $account);
+
+    $state = $provider->getState(new GuidanceRequest(
+      'Evaluate my Lesson 1 attempt.',
+      $account,
+      [
+        'visible_page_messages' => [
+          [
+            'type' => 'error',
+            'text' => 'The page has an error message.',
+          ],
+        ],
+      ],
+    ));
+
+    $this->assertSame('error', $state['request_context']['visible_page_messages'][0]['type']);
+    $this->assertSame('The page has an error message.', $state['request_context']['visible_page_messages'][0]['text']);
+  }
+
+  /**
+   * Tests current form context from the browser is included safely.
+   */
+  public function testCurrentFormFromContext(): void {
+    $route_match = $this->createMock(RouteMatchInterface::class);
+    $route_match->method('getRouteName')->willReturn('node.add');
+    $route_match->method('getRawParameters')->willReturn(new InputBag(['node_type' => 'article']));
+
+    $current_path = $this->createMock(CurrentPathStack::class);
+    $current_path->method('getPath')->willReturn('/node/add/article');
+
+    $router = $this->createMock(UrlMatcherInterface::class);
+    $router->method('match')->willReturn(['_route' => 'node.add', 'node_type' => 'article']);
+
+    $access_manager = $this->createMock(AccessManagerInterface::class);
+    $access_manager->method('checkNamedRoute')->willReturn(TRUE);
+
+    $account = $this->createMock(AccountInterface::class);
+    $account->method('hasPermission')->willReturn(TRUE);
+    $provider = new CurrentRouteStateProvider($route_match, $current_path, $router, $access_manager, $account);
+
+    $state = $provider->getState(new GuidanceRequest(
+      'What can I do on this page?',
+      $account,
+      [
+        'current_form' => [
+          'form_id' => 'node_article_form',
+          'action' => '/node/add/article?destination=/admin/content',
+          'method' => 'post',
+          'fields' => [
+            [
+              'name' => 'title[0][value]',
+              'label' => 'Title',
+              'type' => 'text',
+              'required' => TRUE,
+            ],
+          ],
+          'submit_buttons' => ['Save', 'Preview'],
+        ],
+      ],
+    ));
+
+    $this->assertSame('node_article_form', $state['request_context']['current_form']['form_id']);
+    $this->assertSame('/node/add/article', $state['request_context']['current_form']['action']);
+    $this->assertSame('Title', $state['request_context']['current_form']['fields'][0]['label']);
+    $this->assertTrue($state['request_context']['current_form']['fields'][0]['required']);
+    $this->assertSame(['Save', 'Preview'], $state['request_context']['current_form']['submit_buttons']);
   }
 
 }

@@ -10,6 +10,14 @@ use Drupal\ai_guidance\Value\GuidanceState;
 
 /**
  * Collects structured, read-only evidence for guidance domains.
+ *
+ * Evidence providers are the main extension point for modules that want to add
+ * Drupal-side facts to AI Guidance without adding executable actions. Providers
+ * must return display-safe summaries for the current account, name known
+ * unknowns when they cannot prove a claim, and never expose raw secrets, raw
+ * config dumps, prompt text, or platform/vendor diagnostics outside Drupal.
+ *
+ * @api
  */
 interface GuidanceEvidenceProviderInterface {
 

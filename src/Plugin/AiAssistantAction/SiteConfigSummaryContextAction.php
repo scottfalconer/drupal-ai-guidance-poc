@@ -11,6 +11,7 @@ use Drupal\ai_assistant_api\Attribute\AiAssistantAction;
 use Drupal\ai_guidance\Prompt\GuidanceRedactor;
 use Drupal\ai_guidance\Source\SiteConfigurationSourceProvider;
 use Drupal\ai_guidance\State\GuidanceStateAggregator;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -35,8 +36,9 @@ final class SiteConfigSummaryContextAction extends GuidanceReadOnlyActionBase {
     private readonly GuidanceStateAggregator $stateAggregator,
     private readonly SiteConfigurationSourceProvider $sourceProvider,
     private readonly ?object $siteArchitectureRepository = NULL,
+    ?LoggerInterface $logger = NULL,
   ) {
-    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack, $redactor);
+    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack, $redactor, $logger);
   }
 
   /**
@@ -52,6 +54,7 @@ final class SiteConfigSummaryContextAction extends GuidanceReadOnlyActionBase {
       $container->get('ai_guidance.state_aggregator'),
       $container->get(SiteConfigurationSourceProvider::class),
       $container->has('ai_context_site_architecture.contract_repository') ? $container->get('ai_context_site_architecture.contract_repository') : NULL,
+      $container->get('logger.channel.ai_guidance'),
     );
   }
 
@@ -101,7 +104,10 @@ final class SiteConfigSummaryContextAction extends GuidanceReadOnlyActionBase {
     try {
       $contracts = $this->siteArchitectureRepository->list(FALSE);
     }
-    catch (\Throwable) {
+    catch (\Throwable $exception) {
+      $this->logger->debug('Site architecture contract availability check failed with @class.', [
+        '@class' => get_debug_type($exception),
+      ]);
       return FALSE;
     }
 

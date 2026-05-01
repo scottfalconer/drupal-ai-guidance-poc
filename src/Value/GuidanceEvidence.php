@@ -6,6 +6,12 @@ namespace Drupal\ai_guidance\Value;
 
 /**
  * Structured evidence collected for one guidance domain.
+ *
+ * This value object is safe for contrib evidence providers to return. Keep
+ * values compact, user-visible, and permission-filtered; do not place raw
+ * configuration, secrets, prompts, or unredacted source text in the evidence.
+ *
+ * @api
  */
 final class GuidanceEvidence {
 

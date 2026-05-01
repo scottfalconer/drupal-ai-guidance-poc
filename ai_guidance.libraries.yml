@@ -1,0 +1,6 @@
+page_context:
+  js:
+    js/ai-guidance-page-context.js: {}
+  dependencies:
+    - core/drupal
+    - core/once

@@ -11,16 +11,25 @@ use Drupal\help\HelpTopicPluginManagerInterface;
 use Drupal\ai_guidance\Value\GuidanceRequest;
 use Drupal\ai_guidance\Value\GuidanceSource;
 use Drupal\ai_guidance\Value\GuidanceState;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Provides source documents from core Help Topics.
  */
 final class HelpTopicsSourceProvider implements GuidanceSourceProviderInterface {
 
+  /**
+   * Logger for sanitized source diagnostics.
+   */
+  private readonly LoggerInterface $logger;
+
   public function __construct(
     private readonly HelpTopicPluginManagerInterface $helpTopicPluginManager,
     private readonly RendererInterface $renderer,
+    ?LoggerInterface $logger = NULL,
   ) {
+    $this->logger = $logger ?? new NullLogger();
   }
 
   /**
@@ -57,7 +66,11 @@ final class HelpTopicsSourceProvider implements GuidanceSourceProviderInterface 
         $body_build = $topic->getBody();
         [$body, $cacheability] = $this->renderBody($body_build);
       }
-      catch (\Throwable) {
+      catch (\Throwable $exception) {
+        $this->logger->debug('Skipped Help Topic @topic after @class.', [
+          '@topic' => (string) $id,
+          '@class' => get_debug_type($exception),
+        ]);
         continue;
       }
       $text = GuidanceTextNormalizer::normalize($body);
@@ -121,6 +134,13 @@ final class HelpTopicsSourceProvider implements GuidanceSourceProviderInterface 
     $provider = strtolower((string) ($definition['provider'] ?? ''));
     $haystack = strtolower($id . ' ' . $label . ' ' . $provider);
     $score = 0;
+
+    if (str_contains($question, 'lesson 1') && str_contains($haystack, 'lesson_2')) {
+      return 0;
+    }
+    if (str_contains($question, 'lesson 2') && str_contains($haystack, 'lesson_1')) {
+      return 0;
+    }
 
     $modules = $state->get('site')['enabled_ai_and_relevant_modules'] ?? [];
     if (in_array($definition['provider'] ?? '', $modules, TRUE)) {

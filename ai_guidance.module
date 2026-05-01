@@ -19,6 +19,17 @@ function ai_guidance_help($route_name, RouteMatchInterface $route_match) {
 }
 
 /**
+ * Implements hook_page_attachments().
+ */
+function ai_guidance_page_attachments(array &$attachments) {
+  if (!\Drupal::moduleHandler()->moduleExists('ai_chatbot')) {
+    return;
+  }
+
+  $attachments['#attached']['library'][] = 'ai_guidance/page_context';
+}
+
+/**
  * Implements hook_requirements().
  */
 function ai_guidance_requirements($phase) {

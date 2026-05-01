@@ -6,6 +6,8 @@ namespace Drupal\ai_guidance\Evidence;
 
 use Drupal\ai_guidance\Value\GuidanceRequest;
 use Drupal\ai_guidance\Value\GuidanceState;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Collects evidence from tagged providers.
@@ -23,8 +25,15 @@ final class GuidanceEvidenceCollector {
   public function __construct(
     private readonly GuidanceDomainClassifier $classifier,
     private readonly iterable $providers,
+    ?LoggerInterface $logger = NULL,
   ) {
+    $this->logger = $logger ?? new NullLogger();
   }
+
+  /**
+   * Logger for sanitized provider diagnostics.
+   */
+  private readonly LoggerInterface $logger;
 
   /**
    * Collects evidence for a request and state snapshot.
@@ -56,11 +65,14 @@ final class GuidanceEvidenceCollector {
         $evidence[] = $provider->collect($request, $state, $domains)->toArray();
       }
       catch (\Throwable $exception) {
+        $this->logger->debug('Guidance evidence provider @provider failed with @class.', [
+          '@provider' => $provider->id(),
+          '@class' => get_debug_type($exception),
+        ]);
         $provider_reports[] = [
           'id' => $provider->id(),
           'domains' => $provider_domains,
           'status' => 'failed',
-          'message' => $exception->getMessage(),
         ];
       }
     }

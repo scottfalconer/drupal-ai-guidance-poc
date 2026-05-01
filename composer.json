@@ -1,0 +1,24 @@
+{
+  "name": "drupal/ai_guidance",
+  "description": "Read-only Drupal AI Assistant context actions for site-specific guidance.",
+  "type": "drupal-module",
+  "license": "GPL-2.0-or-later",
+  "require": {
+    "php": ">=8.1",
+    "drupal/core": "^10.5 || ^11.2",
+    "drupal/ai": "^1 || ^2"
+  },
+  "require-dev": {
+    "drupal/coder": "^8.3",
+    "drupal/core-dev": "^10.5 || ^11.2",
+    "mglaman/phpstan-drupal": "^2.0",
+    "phpstan/phpstan": "^2.0"
+  },
+  "suggest": {
+    "drupal/ai_context": "Optional Context Control Center policy-context bridge.",
+    "drupal/ai_best_practices": "Optional Markdown best-practices source bridge.",
+    "drupal/eca": "Optional automation evidence provider.",
+    "drupal/search_api": "Optional search-indexing evidence provider.",
+    "drupal/webform": "Optional form and submission evidence provider."
+  }
+}

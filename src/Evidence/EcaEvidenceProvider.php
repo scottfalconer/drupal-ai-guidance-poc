@@ -9,16 +9,25 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\ai_guidance\Value\GuidanceEvidence;
 use Drupal\ai_guidance\Value\GuidanceRequest;
 use Drupal\ai_guidance\Value\GuidanceState;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Collects generic ECA model evidence when ECA is installed.
  */
 final class EcaEvidenceProvider implements GuidanceEvidenceProviderInterface {
 
+  /**
+   * Logger for sanitized ECA diagnostics.
+   */
+  private readonly LoggerInterface $logger;
+
   public function __construct(
     private readonly ConfigFactoryInterface $configFactory,
     private readonly ModuleHandlerInterface $moduleHandler,
+    ?LoggerInterface $logger = NULL,
   ) {
+    $this->logger = $logger ?? new NullLogger();
   }
 
   /**
@@ -65,7 +74,15 @@ final class EcaEvidenceProvider implements GuidanceEvidenceProviderInterface {
       );
     }
 
-    $config_names = $this->configFactory->listAll('eca.eca.');
+    try {
+      $config_names = $this->configFactory->listAll('eca.eca.');
+    }
+    catch (\Throwable $exception) {
+      $this->logger->debug('ECA model config listing failed with @class.', [
+        '@class' => get_debug_type($exception),
+      ]);
+      $config_names = [];
+    }
     sort($config_names, SORT_STRING);
 
     $models = [];
@@ -207,6 +224,7 @@ final class EcaEvidenceProvider implements GuidanceEvidenceProviderInterface {
    */
   private function canInspectEcaConfiguration(GuidanceRequest $request): bool {
     foreach ([
+      'view ai guidance site inventory',
       'administer ai guidance',
       'administer site configuration',
       'administer eca',

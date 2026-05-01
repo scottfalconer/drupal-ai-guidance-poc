@@ -13,6 +13,7 @@ use Drupal\ai_guidance\Source\HelpTopicsSourceProvider;
 use Drupal\ai_guidance\Source\HookHelpSourceProvider;
 use Drupal\ai_guidance\State\GuidanceStateAggregator;
 use Drupal\ai_guidance\Value\GuidanceSource;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -37,8 +38,9 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
     private readonly GuidanceStateAggregator $stateAggregator,
     private readonly HookHelpSourceProvider $hookHelpSourceProvider,
     private readonly HelpTopicsSourceProvider $helpTopicsSourceProvider,
+    ?LoggerInterface $logger = NULL,
   ) {
-    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack, $redactor);
+    parent::__construct($configuration, $tmpStore, $currentUser, $requestStack, $redactor, $logger);
   }
 
   /**
@@ -54,6 +56,7 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
       $container->get('ai_guidance.state_aggregator'),
       $container->get(HookHelpSourceProvider::class),
       $container->get(HelpTopicsSourceProvider::class),
+      $container->get('logger.channel.ai_guidance'),
     );
   }
 

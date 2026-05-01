@@ -53,6 +53,10 @@ final class GuidanceDebugController extends ControllerBase {
     $request = $this->requestStack->getCurrentRequest();
     $question = trim((string) $request->query->get('question', 'How do I configure Drupal AI safely for content editors?'));
     $question = mb_substr($question, 0, 2000);
+    $context = [];
+    if ($request->query->has('current_route')) {
+      $context['current_route'] = (string) $request->query->get('current_route');
+    }
     $assistant = $this->guidanceEntityTypeManager->getStorage('ai_assistant')->load('drupal_guidance_assistant');
     $contexts = [];
     $enabled_actions = [];
@@ -60,7 +64,7 @@ final class GuidanceDebugController extends ControllerBase {
       $enabled_actions = $assistant->get('actions_enabled') ?: [];
       $contexts = $this->actionPluginManager->listAllContexts($assistant, 'ai_guidance_debug', $enabled_actions);
     }
-    $guidance_request = new GuidanceRequest($question, $this->currentUser());
+    $guidance_request = new GuidanceRequest($question, $this->currentUser(), $context);
     $state = $this->stateAggregator->build($guidance_request);
     $evidence = $this->evidenceCollector->collect($guidance_request, $state);
 
@@ -69,6 +73,7 @@ final class GuidanceDebugController extends ControllerBase {
       'assistant_id' => 'drupal_guidance_assistant',
       'enabled_actions' => array_keys((array) $enabled_actions),
       'question' => $question,
+      'context' => $context,
       'evidence' => $evidence,
       'contexts' => $contexts,
     ];

@@ -10,5 +10,6 @@ services:
       $providerPluginManager: '@ai.provider'
       $moduleHandler: '@module_handler'
       $appRoot: '%app.root%'
+      $logger: '@logger.channel.ai_guidance'
 
   Drupal\ai_guidance_cms_demo\Service\GuidanceAssistantSetupManager: '@ai_guidance_cms_demo.setup_manager'

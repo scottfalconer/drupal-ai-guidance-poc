@@ -10,6 +10,7 @@ use Drupal\Tests\UnitTestCase;
 use Drupal\ai_guidance\Plugin\AiAssistantAction\GuidanceReadOnlyActionBase;
 use Drupal\ai_guidance\Prompt\GuidanceRedactor;
 use Drupal\ai_guidance\Value\GuidanceSource;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
@@ -18,6 +19,41 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * @group ai_guidance
  */
 final class GuidanceReadOnlyActionBaseTest extends UnitTestCase {
+
+  /**
+   * Tests lesson instructions cover overview, start, recap, and CCC context.
+   */
+  public function testLessonUsageInstructionsDescribeThreeStageFlow(): void {
+    $action = new class(
+      [],
+      $this->createMock(PrivateTempStoreFactory::class),
+      $this->createMock(AccountProxyInterface::class),
+      new RequestStack(),
+      new GuidanceRedactor(),
+    ) extends GuidanceReadOnlyActionBase {
+
+      /**
+       * {@inheritdoc}
+       */
+      public function listContexts(): array {
+        return [];
+      }
+
+    };
+
+    $instructions = implode("\n", $action->listUsageInstructions());
+
+    $this->assertStringContainsString('overview, guided task, and recap', $instructions);
+    $this->assertStringContainsString('Practice task', $instructions);
+    $this->assertStringContainsString('What Drupal concept this teaches', $instructions);
+    $this->assertStringContainsString('Ok, start Lesson 1', $instructions);
+    $this->assertStringContainsString('Recap Lesson 1', $instructions);
+    $this->assertStringContainsString('Ok, start Lesson 2', $instructions);
+    $this->assertStringContainsString('https://www.drupal.org/project/ai_context', $instructions);
+    $this->assertStringContainsString('context guides suggestions; Drupal permissions and workflow authorize actions', $instructions);
+    $this->assertStringContainsString('Recap Lesson 2', $instructions);
+    $this->assertStringContainsString('#ai-learners', $instructions);
+  }
 
   /**
    * Tests source links keep visible display citation IDs.
@@ -58,8 +94,9 @@ final class GuidanceReadOnlyActionBaseTest extends UnitTestCase {
       ),
     ]);
 
-    $this->assertContains('- [H1] [Safe AI configuration for content editors](/admin/help/topic/ai_guidance.safe_editor_ai)', $lines);
+    $this->assertContains('- [H1] [Safe AI configuration for content editors](/admin/help/topic/ai_guidance.safe_editor_ai) — Drupal Help Topic from an installed module', $lines);
     $this->assertContains('Source evidence follows. Use the display citation IDs shown in the source bullets; do not expose internal source IDs.', $lines);
+    $this->assertContains('Source bullets include provenance. Linked source bullets point to local Help/Help Topic pages, trusted package docs, module-owned context, or public documentation when a safe URL is available.', $lines);
   }
 
   /**
@@ -119,8 +156,8 @@ final class GuidanceReadOnlyActionBaseTest extends UnitTestCase {
     ]);
 
     $context = implode("\n", $lines);
-    $this->assertContains('- [S1] [Secret source](/admin/help/topic/example)', $lines);
-    $this->assertContains('- [S2] [Metadata URL source](https://docs.example.com/private)', $lines);
+    $this->assertContains('- [S1] [Secret source](/admin/help/topic/example) — Drupal Help Topic from an installed module', $lines);
+    $this->assertContains('- [S2] [Metadata URL source](https://docs.example.com/private) — Drupal Help Topic from an installed module', $lines);
     $this->assertStringContainsString('[redacted]', $context);
     $this->assertStringNotContainsString('Bearer abcdefghijklmnop', $context);
     $this->assertStringNotContainsString('github_pat_abcdefghijklmnopqrstuvwxyz', $context);
@@ -176,6 +213,110 @@ final class GuidanceReadOnlyActionBaseTest extends UnitTestCase {
     $this->assertStringNotContainsString('webform.webform.contact', $context);
     $this->assertStringNotContainsString('views.view.frontpage', $context);
     $this->assertStringNotContainsString('drupal://site/contracts/eca.eca.auth_redirects', $context);
+  }
+
+  /**
+   * Tests caller context is whitelisted and source text is redacted.
+   */
+  public function testRequestContextIsWhitelistedAndRedacted(): void {
+    $request_stack = new RequestStack();
+    $request_stack->push(Request::create(
+      '/api/deepchat',
+      'POST',
+      [],
+      [],
+      [],
+      [],
+      json_encode([
+        'contexts' => [
+          'current_route' => '/node/1/edit?destination=/admin/content',
+          'unsafe' => 'do not pass this through',
+          'visible_page_messages' => [
+            [
+              'type' => 'error',
+              'text' => 'Token github_pat_abcdefghijklmnopqrstuvwxyz should be redacted.',
+            ],
+            [
+              'type' => 'debug',
+              'text' => 'A debug type should become status.',
+            ],
+          ],
+          'current_form' => [
+            'form_id' => 'node_article_form',
+            'action' => '/node/add/article?destination=/admin/content',
+            'method' => 'post',
+            'fields' => [
+              [
+                'name' => 'title[0][value]',
+                'label' => 'Title github_pat_abcdefghijklmnopqrstuvwxyz',
+                'type' => 'text',
+                'required' => TRUE,
+              ],
+              [
+                'name' => 'search_api_exclude[exclude]',
+                'label' => 'Prevent this node from being indexed',
+                'type' => 'checkbox',
+                'required' => FALSE,
+              ],
+              [
+                'name' => 'path[0][alias]',
+                'label' => 'URL alias',
+                'type' => 'text',
+                'required' => FALSE,
+              ],
+              [
+                'name' => 'revision_log[0][value]',
+                'label' => 'Revision log message',
+                'type' => 'textarea',
+                'required' => FALSE,
+              ],
+            ],
+            'submit_buttons' => ['Save'],
+          ],
+        ],
+      ], JSON_THROW_ON_ERROR),
+    ));
+
+    $action = new class(
+      [],
+      $this->createMock(PrivateTempStoreFactory::class),
+      $this->createMock(AccountProxyInterface::class),
+      $request_stack,
+      new GuidanceRedactor(),
+    ) extends GuidanceReadOnlyActionBase {
+
+      /**
+       * {@inheritdoc}
+       */
+      public function listContexts(): array {
+        return [];
+      }
+
+      /**
+       * Exposes sanitized request context for tests.
+       */
+      public function exposeRequestContext(): array {
+        return $this->requestContext();
+      }
+
+    };
+
+    $context = $action->exposeRequestContext();
+
+    $this->assertSame('/node/1/edit?destination=/admin/content', $context['current_route']);
+    $this->assertArrayNotHasKey('unsafe', $context);
+    $this->assertSame('error', $context['visible_page_messages'][0]['type']);
+    $this->assertSame('status', $context['visible_page_messages'][1]['type']);
+    $this->assertStringContainsString('[redacted]', $context['visible_page_messages'][0]['text']);
+    $this->assertStringNotContainsString('github_pat_', $context['visible_page_messages'][0]['text']);
+    $this->assertSame('node_article_form', $context['current_form']['form_id']);
+    $this->assertSame('/node/add/article', $context['current_form']['action']);
+    $this->assertStringContainsString('[redacted]', $context['current_form']['fields'][0]['label']);
+    $form_context = json_encode($context['current_form'], JSON_THROW_ON_ERROR);
+    $this->assertStringNotContainsString('search_api_exclude', $form_context);
+    $this->assertStringNotContainsString('URL alias', $form_context);
+    $this->assertStringNotContainsString('Revision log', $form_context);
+    $this->assertSame(['Save'], $context['current_form']['submit_buttons']);
   }
 
 }
