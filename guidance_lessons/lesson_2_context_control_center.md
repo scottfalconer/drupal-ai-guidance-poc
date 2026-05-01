@@ -78,7 +78,7 @@ Lesson 2 teaches how a Drupal module can provide site policy context that improv
 
 ## What You Will Practice
 
-Create or verify one site policy context item for this site's editorial guidance, then use it to improve a draft Article as a content editor. In the Umami demo, use the sample food-focused policy below.
+Create or verify one site policy context item for this site's editorial guidance, then use it to improve a draft content item as a content editor. In the Umami demo, use the sample food-focused policy below.
 
 ## Suggested Policy
 
@@ -96,8 +96,8 @@ Create or verify one site policy context item for this site's editorial guidance
 1. As a site builder or administrator, open Context Control Center.
 2. Create or verify one editorial policy context for this site. In the Umami demo, name it `Umami editorial voice and AI usage policy`.
 3. Switch to a content editor account.
-4. Open or create a draft Article.
-5. Ask: `What editorial guidance applies to this Article draft?`
+4. Open or create a draft content item.
+5. Ask: `What editorial guidance applies to this content draft?`
 6. Ask the assistant to suggest improvements using the site policy context.
 7. Manually edit the draft if appropriate.
 8. Ask: `Evaluate my Lesson 2 attempt. Did I use the site policy context safely?`
@@ -106,13 +106,13 @@ Create or verify one site policy context item for this site's editorial guidance
 
 - The context describes brand voice or editorial standards.
 - The context includes at least one accessibility or governance rule.
-- The context is scoped to editor-facing AI guidance, Article content, or the relevant site section.
+- The context is scoped to editor-facing AI guidance, content, or the relevant site section.
 - The assistant can use the context when advising a content editor.
 - The learner can explain the difference between policy context, editor suggestions, and Drupal authority.
 
 ## What Drupal Will Check
 
-Drupal can check whether Context Control Center is available, whether relevant policy context is included in assistant evidence, whether the current user is working as a content editor, whether the current content is a draft Article, and whether workflow and permissions still control publishing and configuration. Drupal may not be able to confirm that the learner manually applied every editorial suggestion unless the edited content is available for comparison.
+Drupal can check whether Context Control Center is available, whether relevant policy context is included in assistant evidence, whether the current user is working as a content editor, whether the current content is a draft content item, and whether workflow and permissions still control publishing and configuration. Drupal may not be able to confirm that the learner manually applied every editorial suggestion unless the edited content is available for comparison.
 
 ## Authority Stays With Drupal
 

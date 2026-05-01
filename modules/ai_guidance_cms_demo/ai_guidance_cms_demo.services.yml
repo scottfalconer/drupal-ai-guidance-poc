@@ -9,6 +9,7 @@ services:
       $entityTypeManager: '@entity_type.manager'
       $providerPluginManager: '@ai.provider'
       $moduleHandler: '@module_handler'
+      $configFactory: '@config.factory'
       $appRoot: '%app.root%'
       $logger: '@logger.channel.ai_guidance'
 

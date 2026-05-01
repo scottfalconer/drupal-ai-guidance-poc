@@ -96,7 +96,7 @@ final class AccessEvidenceProvider implements GuidanceEvidenceProviderInterface 
       $known_unknowns[] = 'Current route access could not be resolved for this request.';
     }
     if ($this->isLessonEvaluationQuestion($request->question) && empty($entity['type'])) {
-      $known_unknowns[] = 'Lesson 1 completion cannot be confirmed without current entity evidence from the draft Article page or a content listing.';
+      $known_unknowns[] = 'Lesson 1 completion cannot be confirmed without current entity evidence from the draft content page or a content listing.';
     }
     if ($lesson_evaluation !== []) {
       foreach ((array) ($lesson_evaluation['missing_evidence'] ?? []) as $missing) {
@@ -117,7 +117,7 @@ final class AccessEvidenceProvider implements GuidanceEvidenceProviderInterface 
       }
     }
     if ($this->isLessonEvaluationQuestion($request->question) && empty($entity['type'])) {
-      $next_steps[] = 'If asked to evaluate Lesson 1 without current entity evidence, say "Cannot confirm" and ask the user to open the draft Article edit page or `/admin/content`, then ask again.';
+      $next_steps[] = 'If asked to evaluate Lesson 1 without current entity evidence, say "Cannot confirm" and ask the user to open the draft content edit page or `/admin/content`, then ask again.';
     }
     if (empty($user['can_administer_permissions'])) {
       $next_steps[] = 'For permission changes, ask an administrator to review `/admin/people/permissions`; do not tell the current user to grant permissions directly.';
@@ -345,30 +345,32 @@ final class AccessEvidenceProvider implements GuidanceEvidenceProviderInterface 
     $result = 'cannot_confirm';
     $result_label = 'Cannot confirm';
 
-    $is_article = ($entity['type'] ?? NULL) === 'node' && ($entity['bundle'] ?? NULL) === 'article';
-    $is_saved = $is_article && empty($entity['is_new']) && !empty($entity['id']);
+    $is_content = ($entity['type'] ?? NULL) === 'node';
+    $bundle = trim((string) ($entity['bundle'] ?? ''));
+    $content_label = $bundle !== '' ? $bundle : 'content';
+    $is_saved = $is_content && empty($entity['is_new']) && !empty($entity['id']);
     $is_non_public = ($entity['published'] ?? NULL) === FALSE
       || in_array((string) ($entity['moderation_state'] ?? ''), ['draft', 'unpublished'], TRUE);
 
-    if ($is_article) {
-      $confirmed[] = 'Current entity is an Article node.';
+    if ($is_content) {
+      $confirmed[] = sprintf('Current entity is a Drupal content item (%s).', $content_label);
     }
     else {
-      $missing[] = 'Open the saved draft Article edit page so the assistant can confirm the content type.';
+      $missing[] = 'Open the saved draft content edit page so the assistant can confirm the content type.';
     }
 
     if ($is_saved) {
-      $confirmed[] = 'Current Article is saved and has an entity ID.';
+      $confirmed[] = 'Current content item is saved and has an entity ID.';
     }
     else {
-      $missing[] = 'The assistant cannot confirm a saved Article entity from the current evidence.';
+      $missing[] = 'The assistant cannot confirm a saved content entity from the current evidence.';
     }
 
     if ($is_non_public) {
-      $confirmed[] = 'Current Article is draft or unpublished.';
+      $confirmed[] = 'Current content item is draft or unpublished.';
     }
-    elseif ($is_article) {
-      $missing[] = 'The current Article is not confirmed as draft or unpublished.';
+    elseif ($is_content) {
+      $missing[] = 'The current content item is not confirmed as draft or unpublished.';
     }
 
     $requested_path_access = is_array($request_context['requested_path_access'] ?? NULL)
@@ -376,13 +378,13 @@ final class AccessEvidenceProvider implements GuidanceEvidenceProviderInterface 
       : [];
     $route_name = (string) ($route['name'] ?? $requested_path_access['route_name'] ?? '');
     if ($route_name === 'entity.node.edit_form') {
-      $confirmed[] = 'Current page is the saved Article edit form.';
+      $confirmed[] = 'Current page is the saved content edit form.';
     }
     else {
-      $missing[] = 'Open the saved Article edit page to evaluate the draft directly.';
+      $missing[] = 'Open the saved content edit page to evaluate the draft directly.';
     }
 
-    $missing[] = 'The assistant cannot confirm from this page alone that the Article row was checked in `/admin/content`.';
+    $missing[] = 'The assistant cannot confirm from this page alone that the content row was checked in `/admin/content`.';
     $missing[] = 'The assistant cannot confirm from this page alone that Preview or public view was opened.';
     $missing[] = 'The assistant cannot audit from this page alone that no unrelated configuration, workflow, View, permission, or front-page changes were made.';
 
@@ -394,16 +396,16 @@ final class AccessEvidenceProvider implements GuidanceEvidenceProviderInterface 
     elseif ($is_saved && $is_non_public) {
       $result = 'core_task_complete';
       $result_label = 'Core task complete';
-      $next_steps[] = 'To fully verify Lesson 1, confirm the Article appears in `/admin/content` as Draft or Unpublished.';
+      $next_steps[] = 'To fully verify Lesson 1, confirm the content item appears in `/admin/content` as Draft or Unpublished.';
       $next_steps[] = 'Open Preview or the public view once, then return to the edit page if you want the assistant to evaluate entity state again.';
     }
-    elseif ($is_article) {
+    elseif ($is_content) {
       $result = 'partially_complete';
       $result_label = 'Partially complete';
-      $next_steps[] = 'Keep the Article in a draft or unpublished state before marking the safe lesson task complete.';
+      $next_steps[] = 'Keep the content item in a draft or unpublished state before marking the safe lesson task complete.';
     }
     else {
-      $next_steps[] = 'Open the saved draft Article edit page or `/admin/content`, then ask for Lesson 1 evaluation again.';
+      $next_steps[] = 'Open the saved draft content edit page or `/admin/content`, then ask for Lesson 1 evaluation again.';
     }
 
     return [

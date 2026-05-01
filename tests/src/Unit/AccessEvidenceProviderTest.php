@@ -214,7 +214,7 @@ final class AccessEvidenceProviderTest extends UnitTestCase {
 
     $this->assertSame('core_task_complete', $lesson['result']);
     $this->assertSame('Core task complete', $lesson['result_label']);
-    $this->assertContains('Current Article is draft or unpublished.', $lesson['confirmed_evidence']);
+    $this->assertContains('Current content item is draft or unpublished.', $lesson['confirmed_evidence']);
     $this->assertStringContainsString('/admin/content', implode(' ', $lesson['missing_evidence']));
     $this->assertStringContainsString('Core task complete', implode(' ', $evidence['next_diagnostic_steps']));
   }

@@ -142,6 +142,48 @@ final class GuidanceReadOnlyActionBaseTest extends UnitTestCase {
   }
 
   /**
+   * Tests mirrored lesson Help Topics are labeled as lessons.
+   */
+  public function testLessonHelpTopicSourceProvenance(): void {
+    $action = new class(
+      [],
+      $this->createMock(PrivateTempStoreFactory::class),
+      $this->createMock(AccountProxyInterface::class),
+      new RequestStack(),
+      new GuidanceRedactor(),
+    ) extends GuidanceReadOnlyActionBase {
+
+      /**
+       * {@inheritdoc}
+       */
+      public function listContexts(): array {
+        return [];
+      }
+
+      /**
+       * Exposes source line formatting for tests.
+       */
+      public function exposeSourceLines(array $sources, string $prefix = 'H'): array {
+        return $this->sourceLines($sources, $prefix, 1);
+      }
+
+    };
+
+    $lines = $action->exposeSourceLines([
+      new GuidanceSource(
+        id: 'help:ai_guidance.lesson_1_safe_draft_content',
+        canonicalId: 'ai_guidance.lesson_1_safe_draft_content',
+        title: 'Lesson 1: Create and verify draft content using your role',
+        type: 'help_topic',
+        text: 'Lesson body rendered by Drupal Help.',
+        citations: ['url' => '/admin/help/topic/ai_guidance.lesson_1_safe_draft_content'],
+      ),
+    ]);
+
+    $this->assertContains('- [H1] [Lesson 1: Create and verify draft content using your role](/admin/help/topic/ai_guidance.lesson_1_safe_draft_content) — Learn Drupal AI lesson rendered as a Drupal Help Topic', $lines);
+  }
+
+  /**
    * Tests source evidence is redacted before context formatting.
    */
   public function testSourceLinesRedactSourceTextAndUnsafeUrls(): void {

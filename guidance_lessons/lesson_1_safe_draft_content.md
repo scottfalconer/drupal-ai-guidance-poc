@@ -62,21 +62,21 @@ Lesson 1 teaches how draft content works on the Drupal site you are using right 
 
 ## What You Will Practice
 
-Create exactly one draft Article, verify it in Drupal, then ask the assistant to evaluate what Drupal can confirm.
+Create exactly one draft content item using a content type your role can create, verify it in Drupal, then ask the assistant to evaluate what Drupal can confirm.
 
 ## Guided Task
 
-1. Go to `/node/add/article`.
-2. On that Article creation page, ask: `What can I do on this page?`
-3. Create an Article titled `Lesson 1 test article`.
+1. Go to a content creation page your role can access. In the Umami demo, use `/node/add/article`. On a clean Drupal CMS site, use the available creation page such as `/node/add/page`.
+2. On that content creation page, ask: `What can I do on this page?`
+3. Create one draft content item titled `Lesson 1 test content`.
 4. Save it as draft or unpublished.
 5. Verify that it appears in `/admin/content`.
-6. Open or preview the saved Article, then open its edit page.
-7. On the saved Article edit page, ask: `Evaluate my Lesson 1 attempt. Did I complete the task safely?`
+6. Open or preview the saved content item, then open its edit page.
+7. On the saved content edit page, ask: `Evaluate my Lesson 1 attempt. Did I complete the task safely?`
 
 ## Success Criteria
 
-- The content uses the existing Article content type.
+- The content uses an existing content type your role can create.
 - The content is draft or unpublished.
 - The content appears in `/admin/content`.
 - The content can be opened or previewed for review.

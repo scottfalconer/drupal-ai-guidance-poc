@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\ai_guidance_cms_demo\Service;
 
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\ai\AiProviderPluginManager;
@@ -17,12 +18,14 @@ use Psr\Log\NullLogger;
 final class GuidanceAssistantSetupManager {
 
   public const ASSISTANT_ID = 'drupal_guidance_assistant';
+  public const LESSON_ONE_CONTENT_TITLE = 'Lesson 1 test content';
   public const LESSON_ONE_ARTICLE_TITLE = 'Lesson 1 test article';
   public const LESSON_ONE_BUNDLE = 'article';
   public const LESSON_ONE_ROLE = 'content_editor';
   public const LESSON_TWO_ARTICLE_TITLE = 'Lesson 2 draft article';
   public const LESSON_TWO_CONTEXT_TITLE = 'Umami editorial voice and AI usage policy';
   public const SITE_INVENTORY_PERMISSION = 'view ai guidance site inventory';
+  public const DEEPCHAT_ACCESS_PERMISSION = 'access deepchat api';
   public const CORE_ACTION_IDS = [
     'ai_guidance_site_state_context',
     'ai_guidance_site_config_context',
@@ -45,6 +48,7 @@ final class GuidanceAssistantSetupManager {
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly AiProviderPluginManager $providerPluginManager,
     private readonly ModuleHandlerInterface $moduleHandler,
+    private readonly ConfigFactoryInterface $configFactory,
     private readonly string $appRoot,
     ?LoggerInterface $logger = NULL,
   ) {
@@ -81,6 +85,8 @@ final class GuidanceAssistantSetupManager {
     $assistant->set('ai_agent', NULL);
     $assistant->save();
     $this->ensureLessonOneRolePermissions();
+    $this->ensureGuidanceChatbotBlock();
+    $this->ensureDrupalOrgLinksAllowed();
 
     return [
       'created' => $created,
@@ -112,6 +118,7 @@ final class GuidanceAssistantSetupManager {
       'content_editor_role_available' => $this->roleExists('content_editor'),
       'content_editor_site_inventory_access' => $this->roleHasPermission(self::LESSON_ONE_ROLE, self::SITE_INVENTORY_PERMISSION),
       'content_editor_ccc_policy_access' => $this->roleHasPermission(self::LESSON_ONE_ROLE, 'access published ai context'),
+      'content_editor_chat_access' => $this->roleHasPermission(self::LESSON_ONE_ROLE, self::DEEPCHAT_ACCESS_PERMISSION),
       'lesson_one_content_type_available' => $this->lessonOneContentTypeAvailable(),
       'lesson_one_existing_count' => $this->lessonOneArticleCount(),
       'lesson_two_context_entity_available' => $this->lessonTwoContextEntityAvailable(),
@@ -337,8 +344,11 @@ final class GuidanceAssistantSetupManager {
     }
 
     $changed = FALSE;
-    foreach ([self::SITE_INVENTORY_PERMISSION, 'access published ai context'] as $permission) {
+    foreach ([self::SITE_INVENTORY_PERMISSION, 'access published ai context', self::DEEPCHAT_ACCESS_PERMISSION] as $permission) {
       if ($permission === 'access published ai context' && !$this->moduleHandler->moduleExists('ai_context')) {
+        continue;
+      }
+      if ($permission === self::DEEPCHAT_ACCESS_PERMISSION && !$this->moduleHandler->moduleExists('ai_chatbot')) {
         continue;
       }
       if (!method_exists($role, 'hasPermission') || !$role->hasPermission($permission)) {
@@ -348,6 +358,77 @@ final class GuidanceAssistantSetupManager {
     }
     if ($changed) {
       $role->save();
+    }
+  }
+
+  /**
+   * Points an existing AI chatbot block at the demo Guidance assistant.
+   */
+  private function ensureGuidanceChatbotBlock(): void {
+    if (!$this->moduleHandler->moduleExists('ai_chatbot') || !$this->entityTypeManager->hasDefinition('block')) {
+      return;
+    }
+
+    try {
+      $blocks = $this->entityTypeManager
+        ->getStorage('block')
+        ->loadByProperties(['plugin' => 'ai_deepchat_block']);
+    }
+    catch (\Throwable $exception) {
+      $this->logger->debug('AI chatbot block lookup failed with @class.', [
+        '@class' => get_debug_type($exception),
+      ]);
+      return;
+    }
+
+    foreach ($blocks as $block) {
+      if (!method_exists($block, 'get') || !method_exists($block, 'set') || !method_exists($block, 'save')) {
+        continue;
+      }
+      $settings = $block->get('settings') ?: [];
+      if (!is_array($settings)) {
+        continue;
+      }
+      if (($settings['ai_assistant'] ?? NULL) === self::ASSISTANT_ID) {
+        continue;
+      }
+      $settings['ai_assistant'] = self::ASSISTANT_ID;
+      $settings['first_message'] = 'How can I help you work with this Drupal site?';
+      $block->set('settings', $settings);
+      try {
+        $block->save();
+      }
+      catch (\Throwable $exception) {
+        $this->logger->debug('AI chatbot block update failed with @class.', [
+          '@class' => get_debug_type($exception),
+        ]);
+      }
+    }
+  }
+
+  /**
+   * Allows demo lesson sources to link to Drupal.org documentation.
+   */
+  private function ensureDrupalOrgLinksAllowed(): void {
+    if (!$this->moduleHandler->moduleExists('ai')) {
+      return;
+    }
+
+    try {
+      $config = $this->configFactory->getEditable('ai.settings');
+      $allowed_hosts = $config->get('allowed_hosts') ?: [];
+      if (!is_array($allowed_hosts)) {
+        $allowed_hosts = [];
+      }
+      if (!in_array('www.drupal.org', $allowed_hosts, TRUE)) {
+        $allowed_hosts[] = 'www.drupal.org';
+        $config->set('allowed_hosts', array_values($allowed_hosts))->save();
+      }
+    }
+    catch (\Throwable $exception) {
+      $this->logger->debug('AI allowed-host update failed with @class.', [
+        '@class' => get_debug_type($exception),
+      ]);
     }
   }
 
@@ -365,15 +446,18 @@ final class GuidanceAssistantSetupManager {
   }
 
   /**
-   * Checks whether the Article content type is available.
+   * Checks whether at least one content type is available.
    */
   private function lessonOneContentTypeAvailable(): bool {
     if (!$this->entityTypeManager->hasDefinition('node_type')) {
       return FALSE;
     }
-    return (bool) $this->entityTypeManager
+    return $this->entityTypeManager
       ->getStorage('node_type')
-      ->load(self::LESSON_ONE_BUNDLE);
+      ->getQuery()
+      ->accessCheck(FALSE)
+      ->range(0, 1)
+      ->execute() !== [];
   }
 
   /**
@@ -410,8 +494,10 @@ final class GuidanceAssistantSetupManager {
         ->getStorage('node')
         ->getQuery()
         ->accessCheck(FALSE)
-        ->condition('type', self::LESSON_ONE_BUNDLE)
-        ->condition('title', self::LESSON_ONE_ARTICLE_TITLE)
+        ->condition('title', [
+          self::LESSON_ONE_CONTENT_TITLE,
+          self::LESSON_ONE_ARTICLE_TITLE,
+        ], 'IN')
         ->execute();
     }
     catch (\Throwable $exception) {
@@ -639,12 +725,12 @@ For front-page placement questions, do not recommend the generic "Promoted to fr
 For a "first safe exercise" or new-builder question, recommend exactly one concrete first task with success criteria.
 For Learn Drupal AI lesson questions, treat matching packaged lesson Markdown as the lesson source of truth for goals, practice tasks, prompts, success criteria, and recap. Use lesson-specific instructions below only to shape the answer and evaluation labels.
 All Learn Drupal AI lesson flows use three stages: overview, guided task, and recap. For lesson overview questions, answer with: What you will learn; What you will practice; How Drupal will check your work; When ready, say "Ok, start Lesson N."; Sources. Do not start the task during the overview.
-For Lesson 1 start questions, including "Ok, start Lesson 1", answer as a lesson challenge with these sections: Goal; Practice task; What Drupal concept this teaches; Success criteria; Start here; Sources. The Lesson 1 task is to create exactly one draft Article, verify it in /admin/content, open or preview it, and ask for evaluation. Mention administrator/site-builder work only once as follow-up context for permissions, workflows, Views, and page composition.
-For Lesson 1 evaluation questions, answer from lesson_1_evaluation evidence when present. Use these result labels: Fully verified, Core task complete, Partially complete, or Cannot confirm. If the draft Article entity is confirmed but /admin/content or preview verification is missing, say Core task complete, not Complete. If current entity or content-list evidence is missing, say Cannot confirm and ask the user to open the draft Article edit page or /admin/content before asking again.
+For Lesson 1 start questions, including "Ok, start Lesson 1", answer as a lesson challenge with these sections: Goal; Practice task; What Drupal concept this teaches; Success criteria; Start here; Sources. The Lesson 1 task is to create exactly one draft content item using a content type the current role can create, verify it in /admin/content, open or preview it, and ask for evaluation. If Article is available to the current role, use Article; otherwise use the first safe creatable content type from site evidence, such as Utility page on a clean Drupal CMS site. Mention administrator/site-builder work only once as follow-up context for permissions, workflows, Views, and page composition.
+For Lesson 1 evaluation questions, answer from lesson_1_evaluation evidence when present. Use these result labels: Fully verified, Core task complete, Partially complete, or Cannot confirm. If the draft content entity is confirmed but /admin/content or preview verification is missing, say Core task complete, not Complete. If current entity or content-list evidence is missing, say Cannot confirm and ask the user to open the draft content edit page or /admin/content before asking again.
 For Lesson 1 recap questions such as "Recap Lesson 1", answer with: Concepts learned; Evidence checked; Why it matters; Try next; Continue the discussion in Drupal Slack #ai-learners; Sources.
-For Lesson 2 start questions, including "Ok, start Lesson 2", answer as a site-policy lesson with these sections: Goal; Practice task; What Drupal concept this teaches; What Context Control Center provides; Success criteria; Start here; Sources. Explain that Context Control Center is the Drupal project at https://www.drupal.org/project/ai_context and that it manages reusable site policy/context items for Drupal AI features. The Lesson 2 task is to create or verify one Context Control Center policy context for this site, then test it as a content editor on draft Article content. In the Umami demo, the example context is food-focused editorial guidance. Phrase the boundary as "context guides suggestions; Drupal permissions and workflow authorize actions."
+For Lesson 2 start questions, including "Ok, start Lesson 2", answer as a site-policy lesson with these sections: Goal; Practice task; What Drupal concept this teaches; What Context Control Center provides; Success criteria; Start here; Sources. Explain that Context Control Center is the Drupal project at https://www.drupal.org/project/ai_context and that it manages reusable site policy/context items for Drupal AI features. The Lesson 2 task is to create or verify one Context Control Center policy context for this site, then test it as a content editor on draft content. In the Umami demo, the example context is food-focused editorial guidance. If ai_context or CCC source evidence is absent, clearly say Lesson 2 cannot be completed on this site yet and do not invent policy context. Phrase the boundary as "context guides suggestions; Drupal permissions and workflow authorize actions."
 For Lesson 2 context setup evaluation questions, use Context Control Center source evidence when present. Use result labels: Complete, Partially complete, or Cannot confirm. Confirm whether policy context covers brand voice, editorial standards, accessibility or governance rules, editor-facing scope, and the boundary that AI output is draft assistance only. If CCC evidence is missing, say Cannot confirm and ask the user to open the saved CCC context item or CCC listing.
-For Lesson 2 editor-use evaluation questions, focus on current Article/draft state, visible draft text, policy context availability, and the current user's role boundary. Do not require proof of the exact prior chat prompt or a separate browser session. If the draft text reflects the policy and the content remains draft/unpublished, say Complete and keep any known unknowns brief.
+For Lesson 2 editor-use evaluation questions, focus on current content/draft state, visible draft text, policy context availability, and the current user's role boundary. Say Complete only when Drupal evidence or the learner statement confirms policy-guided editorial review or edits happened and the content remains draft/unpublished. If the user only asked for suggestions, say Partially complete and ask them to manually review or apply an appropriate edit, then verify the draft remains unpublished.
 For Lesson 2 recap questions such as "Recap Lesson 2", answer with: Concepts learned; Evidence checked; Why it matters; Try next; Continue the discussion in Drupal Slack #ai-learners; Sources.
 Site policy context guides suggestions. Drupal permissions, workflows, and editorial review remain authoritative for saving, publishing, configuring AI, changing site structure, and approving content.
 If visible_page_messages includes error or warning messages, mention them under Evidence I can confirm and treat the lesson as Partially complete until the user resolves or explains them.
@@ -683,10 +769,10 @@ For front-page placement questions, do not recommend "Promoted to front page" un
 For lesson questions, use matching packaged lesson Markdown as the source of truth for the lesson goal, practice task, prompts, success criteria, and recap.
 For lesson overview questions, explain what the learner will learn, what they will practice, and how Drupal will check the work. Ask them to reply with "Ok, start Lesson N"; do not start the guided task during the overview.
 For Lesson 1 start questions, including "Ok, start Lesson 1", present a challenge with Goal, Practice task, What Drupal concept this teaches, Success criteria, and Start here.
-For Lesson 1 evaluation questions, return Fully verified, Core task complete, Partially complete, or Cannot confirm; cite the current entity or content-list evidence that supports the result; if the draft Article entity is confirmed but /admin/content or preview verification is missing, say Core task complete; if that entity evidence is missing, say Cannot confirm and ask the user to open the draft Article edit page or /admin/content.
+For Lesson 1 evaluation questions, return Fully verified, Core task complete, Partially complete, or Cannot confirm; cite the current entity or content-list evidence that supports the result; if the draft content entity is confirmed but /admin/content or preview verification is missing, say Core task complete; if that entity evidence is missing, say Cannot confirm and ask the user to open the draft content edit page or /admin/content.
 For Lesson 1 recap questions, summarize concepts learned, evidence checked, why it matters, one next safe learning step, and Drupal Slack #ai-learners.
 For Lesson 2 start questions, including "Ok, start Lesson 2", present a site-policy challenge with Goal, Practice task, What Drupal concept this teaches, What Context Control Center provides, Success criteria, and Start here. Explain that Context Control Center is the Drupal project at https://www.drupal.org/project/ai_context.
-For Lesson 2 evaluation questions, return Complete, Partially complete, or Cannot confirm; cite CCC policy evidence and current entity/role evidence where available. Phrase the boundary as "context guides suggestions; Drupal permissions and workflow authorize actions."
+For Lesson 2 evaluation questions, return Complete, Partially complete, or Cannot confirm; cite CCC policy evidence and current entity/role evidence where available. Say Complete only when Drupal evidence or the learner statement confirms policy-guided review or edits happened and the content remains draft/unpublished. If the user only asked for suggestions, say Partially complete and give the next manual verification step. Phrase the boundary as "context guides suggestions; Drupal permissions and workflow authorize actions."
 For Lesson 2 recap questions, summarize concepts learned, evidence checked, why it matters, one next safe learning step, and Drupal Slack #ai-learners.
 Keep user capabilities separate from assistant capabilities.
 Distinguish "I can guide you" from "I can perform this."

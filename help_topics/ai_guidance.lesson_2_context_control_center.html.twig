@@ -17,7 +17,7 @@ top_level: false
 </ol>
 
 <h2>{% trans %}Goal{% endtrans %}</h2>
-<p>{% trans %}Learn how module-provided policy context can help an assistant give site-specific editorial suggestions for a draft Article.{% endtrans %}</p>
+<p>{% trans %}Learn how module-provided policy context can help an assistant give site-specific editorial suggestions for a draft content item.{% endtrans %}</p>
 
 <h2>{% trans %}Scenario{% endtrans %}</h2>
 <p>{% trans %}In Lesson 1, you asked what your current role can safely do. In Lesson 2, a site builder adds editorial policy context, then a content editor uses that context while working on draft content.{% endtrans %}</p>
@@ -30,7 +30,7 @@ top_level: false
 <p>{% trans %}Context guides suggestions. Drupal permissions, workflows, and editorial review still decide who may save, publish, configure AI, change site structure, or approve content.{% endtrans %}</p>
 
 <h2>{% trans %}Task{% endtrans %}</h2>
-<p>{% trans %}Create or verify one site policy context item for this site's editorial guidance, then use it to improve a draft Article as a content editor. In the Umami demo, use the sample food-focused policy below.{% endtrans %}</p>
+<p>{% trans %}Create or verify one site policy context item for this site's editorial guidance, then use it to improve a draft content item as a content editor. In the Umami demo, use the sample food-focused policy below.{% endtrans %}</p>
 
 <h2>{% trans %}Suggested policy{% endtrans %}</h2>
 <ul>
@@ -48,21 +48,21 @@ top_level: false
 <ul>
   <li>{% trans %}The context describes brand voice or editorial standards.{% endtrans %}</li>
   <li>{% trans %}The context includes at least one accessibility or governance rule.{% endtrans %}</li>
-  <li>{% trans %}The context is scoped to editor-facing AI guidance, Article content, or the relevant site section.{% endtrans %}</li>
+  <li>{% trans %}The context is scoped to editor-facing AI guidance, content, or the relevant site section.{% endtrans %}</li>
   <li>{% trans %}The assistant can use the context when advising a content editor.{% endtrans %}</li>
   <li>{% trans %}The learner can explain the difference between policy context, editor suggestions, and Drupal authority.{% endtrans %}</li>
 </ul>
 
 <h2>{% trans %}What Drupal will check{% endtrans %}</h2>
-<p>{% trans %}Drupal can check whether Context Control Center is available, whether relevant policy context is included in assistant evidence, whether the current user is working as a content editor, whether the current content is a draft Article, and whether workflow and permissions still control publishing and configuration. Drupal may not be able to confirm that the learner manually applied every editorial suggestion unless the edited content is available for comparison.{% endtrans %}</p>
+<p>{% trans %}Drupal can check whether Context Control Center is available, whether relevant policy context is included in assistant evidence, whether the current user is working as a content editor, whether the current content is a draft content item, and whether workflow and permissions still control publishing and configuration. Drupal may not be able to confirm that the learner manually applied every editorial suggestion unless the edited content is available for comparison.{% endtrans %}</p>
 
 <h2>{% trans %}Exercise{% endtrans %}</h2>
 <ol>
   <li>{% trans %}As a site builder or administrator, open Context Control Center.{% endtrans %}</li>
   <li>{% trans %}Create or verify one editorial policy context for this site. In the Umami demo, name it <em>Umami editorial voice and AI usage policy</em>.{% endtrans %}</li>
   <li>{% trans %}Switch to a content editor account.{% endtrans %}</li>
-  <li>{% trans %}Open or create a draft Article.{% endtrans %}</li>
-  <li>{% trans %}Ask the assistant: <em>What editorial guidance applies to this Article draft?</em>{% endtrans %}</li>
+  <li>{% trans %}Open or create a draft content item.{% endtrans %}</li>
+  <li>{% trans %}Ask the assistant: <em>What editorial guidance applies to this content draft?</em>{% endtrans %}</li>
   <li>{% trans %}Ask the assistant to suggest improvements using the site policy context.{% endtrans %}</li>
   <li>{% trans %}Manually edit the draft if appropriate.{% endtrans %}</li>
   <li>{% trans %}Ask: <em>Evaluate my Lesson 2 attempt. Did I use the site policy context safely?</em>{% endtrans %}</li>
