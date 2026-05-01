@@ -100,9 +100,13 @@ ddev drush cr
 Verify the clean CMS install:
 
 ```bash
-ddev drush core:requirements | grep -A3 -B1 'AI Guidance'
+ddev drush core:requirements --format=json >/tmp/ai-guidance-requirements.json
+ddev drush ev '$requirements = \Drupal::moduleHandler()->invoke("ai_guidance", "requirements", ["runtime"]); foreach ($requirements as $key => $row) { echo $key . ": " . (string) $row["value"] . PHP_EOL; }'
 ddev drush ev '$defs = \Drupal::service("ai_assistant_api.action_plugin.manager")->getDefinitions(); foreach (["ai_guidance_site_state_context", "ai_guidance_site_config_context", "ai_guidance_help_context"] as $id) { echo $id . ": " . (isset($defs[$id]) ? "yes" : "no") . PHP_EOL; }'
 ddev drush ev '$assistant = \Drupal::entityTypeManager()->getStorage("ai_assistant")->load("drupal_guidance_assistant"); $contexts = \Drupal::service("ai_assistant_api.action_plugin.manager")->listAllContexts($assistant, "clean-cms-smoke", $assistant->get("actions_enabled") ?: []); echo "contexts=" . count($contexts) . PHP_EOL; foreach ($contexts as $context) { echo ($context["title"] ?? "untitled") . PHP_EOL; }'
+ddev drush ai-guidance:lesson-list
+ddev drush ai-guidance:lesson-export lesson_1 --format=json
+ddev drush ai-guidance:lesson-validate
 ddev drush ai-guidance:reset-lesson-1
 ddev drush ai-guidance:setup-lesson-2
 ```

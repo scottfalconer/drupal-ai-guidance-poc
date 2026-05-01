@@ -77,7 +77,7 @@ Page:
 or:
 
 ```text
-/admin/help/topic/ai_guidance.lesson_1_safe_drupal_ai
+/admin/help/topic/ai_guidance.lesson_1_safe_draft_content
 ```
 
 Prompt:
@@ -329,7 +329,7 @@ Expected answer:
 | Moment | Page |
 | --- | --- |
 | Setup / refresh assistant | `/admin/config/ai/guidance/demo` |
-| Optional lesson source | `/admin/help/topic/ai_guidance.lesson_1_safe_drupal_ai` |
+| Optional lesson source | `/admin/help/topic/ai_guidance.lesson_1_safe_draft_content` |
 | Overview and start | setup page, Help Topic, or first accessible learner page |
 | Ask "What can I do on this page?" | `/node/add/article` |
 | Create draft | `/node/add/article` |

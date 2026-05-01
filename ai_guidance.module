@@ -1,5 +1,7 @@
 <?php
 
+use Drupal\Core\Extension\Requirement\RequirementSeverity;
+use Drupal\Core\Hook\Attribute\LegacyRequirementsHook;
 use Drupal\Core\Routing\RouteMatchInterface;
 
 /**
@@ -32,6 +34,7 @@ function ai_guidance_page_attachments(array &$attachments) {
 /**
  * Implements hook_requirements().
  */
+#[LegacyRequirementsHook]
 function ai_guidance_requirements($phase) {
   if ($phase !== 'runtime') {
     return [];
@@ -42,7 +45,7 @@ function ai_guidance_requirements($phase) {
     'ai_guidance_ai_assistant_api_context_support' => [
       'title' => t('AI Guidance AI Assistant API support'),
       'value' => $has_context_support ? t('Detected') : t('Not detected'),
-      'severity' => $has_context_support ? REQUIREMENT_OK : REQUIREMENT_WARNING,
+      'severity' => $has_context_support ? RequirementSeverity::OK : RequirementSeverity::Warning,
       'description' => $has_context_support
         ? t('AI Assistant API appears to support enabled read-only context actions for context-only assistants.')
         : t('AI Guidance needs AI Assistant API support for enabled read-only context actions. Apply patches/ai-assistant-api-context-actions.patch or use an AI module version with equivalent behavior before using the demo assistant broadly.'),

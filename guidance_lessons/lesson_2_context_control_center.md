@@ -1,12 +1,31 @@
 ---
+schema_version: 1
 title: "Lesson 2: Use module-provided policy context while editing draft content"
 canonical_id: "ai_guidance.lesson_2_context_control_center"
 lesson_id: "lesson_2"
+kind: guided_task
+status: draft
 version: 1
 priority: 90
-audience:
+roles:
+  setup:
+    - site_builder
+    - administrator
+  learner:
+    - content_editor
+requires_setup_by:
   - site_builder
+  - administrator
+learner_role:
   - content_editor
+audience:
+  - content_editor
+domains:
+  - ai_context
+  - editorial_policy
+  - ai_feature_access
+  - workflow
+  - role_permissions
 tags:
   - learn_drupal_ai
   - context_control_center
@@ -17,9 +36,27 @@ stage_prompts:
   start: "Ok, start Lesson 2."
   evaluate: "Evaluate my Lesson 2 attempt. Did I use the site policy context safely?"
   recap: "Recap Lesson 2."
+requires:
+  modules:
+    - ai_context
+  roles_any:
+    - content_editor
+fallback_if_missing: "Ask a site builder or administrator to enable or configure Context Control Center before starting this lesson."
+evidence_providers:
+  - access_explain
+  - ai_feature_access_explain
+  - ai_context_explain
+  - current_entity_explain
+  - workflow_explain
+exports:
+  help: true
+  chat: true
+  mcp: true
 source_url: "/admin/help/topic/ai_guidance.lesson_2_context_control_center"
 external_links:
   context_control_center: "https://www.drupal.org/project/ai_context"
+community:
+  slack: "#ai-learners"
 ---
 
 # Lesson 2: Use module-provided policy context while editing draft content
@@ -41,7 +78,7 @@ Lesson 2 teaches how a Drupal module can provide site policy context that improv
 
 ## What You Will Practice
 
-Create or verify one site policy context item for Umami editorial guidance, then use it to improve a draft Article as a content editor.
+Create or verify one site policy context item for this site's editorial guidance, then use it to improve a draft Article as a content editor. In the Umami demo, use the sample food-focused policy below.
 
 ## Suggested Policy
 
@@ -57,7 +94,7 @@ Create or verify one site policy context item for Umami editorial guidance, then
 ## Guided Task
 
 1. As a site builder or administrator, open Context Control Center.
-2. Create or verify the Umami editorial policy context.
+2. Create or verify one editorial policy context for this site. In the Umami demo, name it `Umami editorial voice and AI usage policy`.
 3. Switch to a content editor account.
 4. Open or create a draft Article.
 5. Ask: `What editorial guidance applies to this Article draft?`
@@ -72,6 +109,10 @@ Create or verify one site policy context item for Umami editorial guidance, then
 - The context is scoped to editor-facing AI guidance, Article content, or the relevant site section.
 - The assistant can use the context when advising a content editor.
 - The learner can explain the difference between policy context, editor suggestions, and Drupal authority.
+
+## What Drupal Will Check
+
+Drupal can check whether Context Control Center is available, whether relevant policy context is included in assistant evidence, whether the current user is working as a content editor, whether the current content is a draft Article, and whether workflow and permissions still control publishing and configuration. Drupal may not be able to confirm that the learner manually applied every editorial suggestion unless the edited content is available for comparison.
 
 ## Authority Stays With Drupal
 

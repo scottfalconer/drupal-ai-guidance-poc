@@ -28,9 +28,12 @@ final class LessonSourceProviderTest extends UnitTestCase {
     mkdir($root . '/guidance_lessons', 0777, TRUE);
     file_put_contents($root . '/guidance_lessons/lesson_3_editor_review.md', <<<'MD'
 ---
+schema_version: 1
 title: "Lesson 3: Review draft content"
 canonical_id: "custom_lessons.lesson_3_editor_review"
 lesson_id: "lesson_3"
+kind: guided_task
+status: draft
 stage_prompts:
   overview: "Show me the Lesson 3 overview."
   start: "Ok, start Lesson 3."
@@ -39,6 +42,10 @@ stage_prompts:
 tags:
   - learn_drupal_ai
   - editorial_review
+domains:
+  - editorial_review
+evidence_providers:
+  - access_explain
 source_url: "https://example.com/lessons/lesson-3"
 priority: 75
 ---
@@ -76,9 +83,17 @@ MD);
     $this->assertSame('custom_lessons.lesson_3_editor_review', $sources[0]->canonicalId);
     $this->assertSame('lesson_package', $sources[0]->metadata['source_class']);
     $this->assertSame('lesson_3', $sources[0]->metadata['lesson_id']);
+    $this->assertSame('guided_task', $sources[0]->metadata['kind']);
+    $this->assertSame(['editorial_review'], $sources[0]->metadata['domains']);
+    $this->assertSame(['access_explain'], $sources[0]->metadata['evidence_providers']);
     $this->assertSame('Ok, start Lesson 3.', $sources[0]->metadata['stage_prompts']['start']);
     $this->assertSame('https://example.com/lessons/lesson-3', $sources[0]->citations['source_url']);
     $this->assertStringContainsString('What you will learn', $sources[0]->text);
+
+    $documents = iterator_to_array($provider->allDocuments());
+    $this->assertCount(1, $documents);
+    $this->assertSame('custom_lessons.lesson_3_editor_review', $documents[0]['canonical_id']);
+    $this->assertArrayHasKey('what_you_will_learn', $documents[0]['sections']);
   }
 
   /**

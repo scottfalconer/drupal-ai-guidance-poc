@@ -134,11 +134,11 @@ final class GuidanceReadOnlyActionBaseTest extends UnitTestCase {
         title: 'Lesson 1: Create and verify draft content using your role',
         type: 'lesson_package',
         text: '## What You Will Learn',
-        citations: ['source_url' => '/admin/help/topic/ai_guidance.lesson_1_safe_drupal_ai'],
+        citations: ['source_url' => '/admin/help/topic/ai_guidance.lesson_1_safe_draft_content'],
       ),
     ]);
 
-    $this->assertContains('- [H1] [Lesson 1: Create and verify draft content using your role](/admin/help/topic/ai_guidance.lesson_1_safe_drupal_ai) — packaged Learn Drupal AI lesson Markdown from an installed module', $lines);
+    $this->assertContains('- [H1] [Lesson 1: Create and verify draft content using your role](/admin/help/topic/ai_guidance.lesson_1_safe_draft_content) — packaged Learn Drupal AI lesson Markdown from an installed module', $lines);
   }
 
   /**

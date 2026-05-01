@@ -40,17 +40,62 @@ final class LessonSourceProvider implements GuidanceSourceProviderInterface {
    */
   public function getSources(GuidanceRequest $request, GuidanceState $state): iterable {
     $question = strtolower($request->question);
-    foreach ($this->lessonFiles() as [$module, $path]) {
-      $source = $this->parser->parseFile($path, $module, 'lesson_package');
-      if (!$source instanceof GuidanceSource) {
-        continue;
-      }
+    foreach ($this->allSources() as $source) {
       $score = $this->sourceScore($source, $question);
       if ($score <= 0) {
         continue;
       }
       yield $source;
     }
+  }
+
+  /**
+   * Returns every enabled lesson package as a source.
+   *
+   * @return iterable<\Drupal\ai_guidance\Value\GuidanceSource>
+   *   Lesson sources.
+   */
+  public function allSources(): iterable {
+    foreach ($this->lessonFiles() as [$module, $path]) {
+      $source = $this->parser->parseFile($path, $module, 'lesson_package');
+      if ($source instanceof GuidanceSource) {
+        yield $source;
+      }
+    }
+  }
+
+  /**
+   * Returns every enabled lesson package as normalized documents.
+   *
+   * @return iterable<array<string,mixed>>
+   *   Lesson documents.
+   */
+  public function allDocuments(): iterable {
+    foreach ($this->lessonFiles() as [$module, $path]) {
+      $document = $this->parser->parseFileDocument($path, $module, 'lesson_package');
+      if (is_array($document)) {
+        yield $document;
+      }
+    }
+  }
+
+  /**
+   * Finds a lesson document by lesson ID or canonical ID.
+   *
+   * @return array<string,mixed>|null
+   *   Normalized lesson document, or NULL when not found.
+   */
+  public function document(string $id): ?array {
+    $needle = strtolower(str_replace('-', '_', $id));
+    foreach ($this->allDocuments() as $document) {
+      $metadata = (array) ($document['metadata'] ?? []);
+      $lesson_id = isset($metadata['lesson_id']) ? strtolower(str_replace('-', '_', (string) $metadata['lesson_id'])) : '';
+      $canonical_id = strtolower((string) ($document['canonical_id'] ?? ''));
+      if ($lesson_id === $needle || $canonical_id === strtolower($id)) {
+        return $document;
+      }
+    }
+    return NULL;
   }
 
   /**

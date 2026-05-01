@@ -55,6 +55,14 @@ guidance_lessons/lesson_2_context_control_center.md
 See [`docs/lessons.md`](docs/lessons.md) for the front matter fields, expected
 Markdown shape, and extension pattern for other modules.
 
+Use Drush to inspect the compiled lesson shape:
+
+```bash
+drush ai-guidance:lesson-list
+drush ai-guidance:lesson-export lesson_1 --format=json
+drush ai-guidance:lesson-validate
+```
+
 ## Install on Drupal CMS
 
 AI Guidance was validated on a clean Drupal CMS 2.x site with Drupal core 11.3,

@@ -1,0 +1,8 @@
+services:
+  ai_guidance.lesson_commands:
+    class: Drupal\ai_guidance\Drush\Commands\GuidanceLessonCommands
+    arguments:
+      - '@Drupal\ai_guidance\Source\LessonSourceProvider'
+      - '@module_handler'
+    tags:
+      - { name: drush.command }

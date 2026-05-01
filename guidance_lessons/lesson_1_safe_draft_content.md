@@ -1,11 +1,19 @@
 ---
+schema_version: 1
 title: "Lesson 1: Create and verify draft content using your role"
 canonical_id: "ai_guidance.lesson_1_safe_draft_content"
 lesson_id: "lesson_1"
+kind: guided_task
+status: draft
 version: 1
 priority: 90
 audience:
   - content_editor
+domains:
+  - content_creation
+  - workflow
+  - role_permissions
+  - content_visibility
 tags:
   - learn_drupal_ai
   - draft_content
@@ -16,7 +24,26 @@ stage_prompts:
   start: "Ok, start Lesson 1."
   evaluate: "Evaluate my Lesson 1 attempt. Did I complete the task safely?"
   recap: "Recap Lesson 1."
-source_url: "/admin/help/topic/ai_guidance.lesson_1_safe_drupal_ai"
+requires:
+  modules:
+    - node
+  modules_optional:
+    - content_moderation
+  roles_any:
+    - content_editor
+evidence_providers:
+  - access_explain
+  - current_form_explain
+  - current_entity_explain
+  - workflow_explain
+  - content_visibility_explain
+exports:
+  help: true
+  chat: true
+  mcp: true
+source_url: "/admin/help/topic/ai_guidance.lesson_1_safe_draft_content"
+community:
+  slack: "#ai-learners"
 ---
 
 # Lesson 1: Create and verify draft content using your role

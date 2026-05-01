@@ -299,7 +299,7 @@ final class GuidanceDemoSetupForm extends FormBase {
     ];
     $items[] = [
       '#markup' => '<strong>' . $this->t('Lesson source') . ':</strong> '
-        . $this->linkPathText($this->t('Open Lesson 1 Help Topic'), '/admin/help/topic/ai_guidance.lesson_1_safe_drupal_ai'),
+        . $this->linkPathText($this->t('Open Lesson 1 Help Topic'), '/admin/help/topic/ai_guidance.lesson_1_safe_draft_content'),
     ];
     $items[] = [
       '#markup' => '<strong>' . $this->t('Debug task-page evidence') . ':</strong> '

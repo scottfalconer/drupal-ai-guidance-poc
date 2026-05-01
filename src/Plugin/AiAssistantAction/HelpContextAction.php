@@ -136,7 +136,7 @@ final class HelpContextAction extends GuidanceReadOnlyActionBase {
     }
     elseif ($this->isLessonQuestion($lower_question)) {
       $limits['lesson_package'] = 1;
-      $limits['help_topic'] = 2;
+      $limits['help_topic'] = 0;
     }
 
     $selected = [];
